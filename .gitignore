@@ -23,6 +23,12 @@ bin/
 !/docs/licenses/
 !/docs/ARCHITECTURE.md
 !/docs/images/
+!/docs/req/
+!/docs/plans/
+!/docs/evidence/
+!/docs/evidence/*.log
+!/docs/architecture/
+!/docs/debt-register.md
 # Browser captures and design references are local workbench artifacts, never CI inputs.
 /docs/screenshots/
 /CLAUDE.md

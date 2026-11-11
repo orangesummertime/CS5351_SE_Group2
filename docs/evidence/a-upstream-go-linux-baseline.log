@@ -1,0 +1,56 @@
+# Environment: WSL2 Linux native filesystem; Go 1.27.1; pinned upstream source; src/web/dist copied from successful frontend build; command: cd src && go test ./...
+# This header was added after the run. Raw command output follows; (cached) entries were not forced with -count=1.
+ok  	tangentry/cmd/tangentry-desktop	2.673s
+?   	tangentry/cmd/tangentry-mcp	[no test files]
+?   	tangentry/cmd/tangentry-server	[no test files]
+ok  	tangentry/internal/adapters/aichat	(cached)
+ok  	tangentry/internal/adapters/articles	(cached)
+ok  	tangentry/internal/adapters/feeds	(cached)
+ok  	tangentry/internal/adapters/filesystem	(cached)
+?   	tangentry/internal/adapters/htmlimage	[no test files]
+?   	tangentry/internal/adapters/papers	[no test files]
+ok  	tangentry/internal/adapters/platforms/bilibili	(cached)
+ok  	tangentry/internal/adapters/platforms/discourse	(cached)
+ok  	tangentry/internal/adapters/platforms/douyin	(cached)
+ok  	tangentry/internal/adapters/platforms/xiaohongshu	(cached)
+ok  	tangentry/internal/adapters/platforms/xiaoyuzhou	(cached)
+ok  	tangentry/internal/adapters/platforms/youtube	(cached)
+ok  	tangentry/internal/adapters/sqlite	(cached)
+ok  	tangentry/internal/adapters/storage/local	(cached)
+ok  	tangentry/internal/adapters/storage/webdav	(cached)
+ok  	tangentry/internal/adapters/tools	(cached)
+ok  	tangentry/internal/agent	(cached)
+ok  	tangentry/internal/agent/gateway	(cached)
+ok  	tangentry/internal/agent/mcp	(cached)
+ok  	tangentry/internal/ai	(cached)
+ok  	tangentry/internal/app	(cached)
+ok  	tangentry/internal/articles	(cached)
+ok  	tangentry/internal/automaticsubtitles	(cached)
+ok  	tangentry/internal/automaticsubtitles/worker	(cached)
+ok  	tangentry/internal/backup	(cached)
+?   	tangentry/internal/config	[no test files]
+ok  	tangentry/internal/content	(cached)
+ok  	tangentry/internal/credentials	(cached)
+ok  	tangentry/internal/desktop	(cached)
+ok  	tangentry/internal/discovery	(cached)
+?   	tangentry/internal/documents	[no test files]
+ok  	tangentry/internal/downloads	(cached)
+ok  	tangentry/internal/favoritesync	(cached)
+?   	tangentry/internal/history	[no test files]
+?   	tangentry/internal/jobs	[no test files]
+ok  	tangentry/internal/layering	(cached)
+ok  	tangentry/internal/netpolicy	(cached)
+ok  	tangentry/internal/notes	(cached)
+ok  	tangentry/internal/papers	(cached)
+ok  	tangentry/internal/platformfetch	(cached)
+ok  	tangentry/internal/playback	(cached)
+?   	tangentry/internal/preferences	[no test files]
+ok  	tangentry/internal/readingprogress	(cached)
+ok  	tangentry/internal/readstate	(cached)
+ok  	tangentry/internal/server	(cached)
+ok  	tangentry/internal/subscriptions	(cached)
+ok  	tangentry/internal/subtitles	(cached)
+ok  	tangentry/internal/transcription	(cached)
+ok  	tangentry/internal/transport/http	(cached)
+?   	tangentry/web	[no test files]
+?   	tangentry/web/tests/server	[no test files]
