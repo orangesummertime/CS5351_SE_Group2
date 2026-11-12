@@ -6,8 +6,10 @@
 - **Scope:** B baseline, draft FR-02/NFR-02/INV-04/INV-05, ADR-002, hybrid
   retrieval test plan, evaluation protocol, PDF extraction design, debt
   register, course test layout and AI-use disclosure.
-- **Review:** Awaiting an independent non-author reviewer. No implementation,
-  evaluation run or approval is claimed.
+- **Review:** First review returned CHANGES REQUIRED on `55ec38b`; the four
+  findings and two consistency nits were addressed in the follow-up commits
+  listed below and await re-review. No implementation, evaluation run or
+  approval is claimed.
 
 > Numbering note: this package was written as 005 while only 001 existed on
 > `main` and A's 002–004 were still unmerged. A's records have since merged, so
@@ -48,7 +50,7 @@ The package makes B's retrieval work reviewable before any code is written:
 - [implementation plan](../docs/plans/b-retrieval-preimplementation.md) defines
   the hybrid interfaces, sentence/segment splitter, embedding/rerank ports,
   provider settings, B budget, PDF/PaddleOCR flow, content revision, C
-  dependency, B-T01–B-T38 deterministic tests, negative coverage and phased
+  dependency, B-T01–B-T39 deterministic tests, negative coverage and phased
   verification.
 - [evaluation protocol](../docs/evidence/b-eval-protocol.md) fixes the NFR-02
   dataset, gold YAML, baseline/lexical/hybrid comparison, frozen-vector
@@ -118,6 +120,51 @@ Limits:
   rotated. Do not treat the pasted snippet as a secret store.
 - The root README B owner cell is updated to WANG Jiaqi; no other task owner is
   claimed.
+
+## Review response (PR #2 CHANGES REQUIRED)
+
+The reviewer asked for four changes on `55ec38b`. Each was answered in its own
+commit so it can be checked line by line:
+
+1. **Semantic recall.** The pipeline previously kept only the lexical top-K
+   before embedding, so a paraphrase or cross-language question with no lexical
+   overlap could never reach the embedder. ADR-002 now defines a deterministic
+   **bounded semantic sweep** (decision step 1b): when an embedder is configured
+   and the lexical shortlist is smaller than `minLexicalCandidates` (default 20)
+   or has zero distinct-query-term coverage, a position-stratified sample of the
+   whole document is unioned into the candidate set, bounded by
+   `maxSweepCandidates` (default 200) and the remaining B embedding budget. The
+   recall claim is narrowed to "paraphrases reachable inside the sweep bound",
+   `semantic_sweep_limited` reports when the budget cannot cover the document,
+   AC-FR-02-19 and B-T39 cover a zero-overlap pair (same-language and
+   cross-language) plus a sweep-clamped fixture, and the evaluation protocol
+   requires both.
+2. **Zero-request invariant vs. ordering.** Embedding and rerank do run before
+   assembly, so INV-04 now has two halves backed by an explicit ordering
+   contract: preflight-detectable impossibility (invalid budget, budget below the
+   mandatory minimum, mandatory layers alone over the byte cap) starts zero chat,
+   zero embedding and zero rerank requests; a failure that appears only during
+   assembly starts zero chat requests and reports the embedding/rerank requests
+   already spent, with no retry. B-T21 and B-T24 assert both halves with exact
+   per-endpoint counts, and new AC-INV-04-5 binds the request-count assertions.
+3. **Operation-log accuracy.** The log listed `git push` and the GitHub API PR
+   create/update and then claimed no network write. The notes now say no AI
+   provider was called and no browser was started, that network writes did occur
+   and are listed, and what did not happen (no embedding/rerank/OCR/completion
+   endpoint, no upload). A `network_writes` field was added to both B entries so
+   the list and the prose cannot diverge again.
+4. **Candidate limit.** The scoring section said default 100 while the pipeline
+   section said top-K 200. Both now use top-K default 100 (accepted 20–1,000),
+   and top-K and `maxSweepCandidates` are explicitly named as separate knobs in
+   the ADR, the plan and the evaluation protocol.
+
+Also in this revision: `main` up to `726af33` is merged in, and this record was
+renumbered from 005 to 006 because A's `005-owner-a-follow-up.md` merged first.
+The shared `contributions/README.md`, `docs/debt-register.md` and
+`docs/req/requirements.yaml` were resolved into one owner-indexed shape: the
+requirement registry now holds A's FR-01/NFR-01/INV-01–03 and B's
+FR-02/NFR-02/INV-04–05 in a single `scope: group` file, with both sets unchanged
+entry by entry.
 
 ## Presentation explanation
 
