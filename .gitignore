@@ -29,6 +29,8 @@ bin/
 !/docs/evidence/*.log
 !/docs/architecture/
 !/docs/debt-register.md
+!/docs/review-memo.md
+!/docs/ai-use-log.yaml
 # Browser captures and design references are local workbench artifacts, never CI inputs.
 /docs/screenshots/
 /CLAUDE.md
