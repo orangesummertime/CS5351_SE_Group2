@@ -445,8 +445,12 @@ requirements:
     statement: >-
       The assembled context never exceeds the configured character budget in
       Unicode code points or the backend hard cap of 200,000 UTF-8 bytes under
-      any input or budget combination. If assembly cannot fit after the
-      documented fallback actions, it is rejected before any provider request.
+      any input or budget combination. An assembly that is impossible before
+      retrieval is rejected by a preflight check that starts zero chat,
+      embedding and rerank requests. An assembly that only fails after
+      embedding/rerank already ran is rejected with zero chat requests; the
+      embedding and rerank requests already spent are counted and reported, not
+      retried.
     fit:
       - id: AC-INV-04-1
         scenario: >-
@@ -473,14 +477,31 @@ requirements:
           context is reduced or rejected, never sent over the wire.
         test: B-T17
       - id: AC-INV-04-4
-        scenario: "The selected passages, summary material and history together exceed the budget."
+        scenario: >-
+          The selected passages, summary material and history together exceed
+          the budget, either detectably before retrieval or only after
+          embedding/rerank already ran.
         expected: >-
-          The assembler drops the lowest-scored whole sentence/segment and
-          recomputes; if still over, it drops summary material and then the
-          oldest history turn; if still over, it returns context_budget_exceeded
-          and starts zero provider requests. It never truncates a citation into a
-          partial locator.
+          Preflight half: a budget below the mandatory minimum is rejected
+          before candidate generation, so chat, embedding and rerank request
+          counts are all zero. Post-embedding half: the assembler drops the
+          lowest-scored whole sentence/segment and recomputes; if still over, it
+          drops summary material and then the oldest history turn; if still over,
+          it returns context_budget_exceeded with zero chat requests and reports
+          the embedding/rerank requests already spent. It never truncates a
+          citation into a partial locator.
         test: B-T21
+      - id: AC-INV-04-5
+        scenario: >-
+          An impossible assembly is rejected, either by preflight or after
+          embedding/rerank, while the fake provider counts every POST and every
+          embedding/rerank request.
+        expected: >-
+          The observed chat completion POST count is zero in both paths. In the
+          preflight path the embedding and rerank request counts are also zero;
+          in the post-embedding path they equal the attempts already made, are
+          reported in the result, and no retry follows.
+        test: B-T24
     tradeoff: >-
       The budget is counted in characters and bytes, not provider tokens, so a
       provider tokenizer may still see a different effective size. Rejecting an

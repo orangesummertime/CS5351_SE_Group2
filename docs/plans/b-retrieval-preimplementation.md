@@ -186,7 +186,9 @@ its `ChatMessage` to `HistoryTurn`.
 
 ### Frontend / backend responsibilities
 
-- **Backend:** load the source by `contentId`; ignore the client-supplied
+- **Backend:** validate the budget and run the preflight feasibility check
+  *before* candidate generation, so a request that can never fit starts no
+  embedding, rerank or chat request; then load the source by `contentId`; ignore the client-supplied
   `context` in retrieval mode; split into sentence/segments; generate lexical
   candidates; when the lexical shortlist is small or has zero query-term
   overlap, add the bounded position-stratified semantic sweep and call the
@@ -337,6 +339,16 @@ Validation and security:
     `rerank_budget_exhausted`, `embedding_usage_unknown`,
     `embedding_unavailable`, `rerank_unavailable`;
   - the UI shows B's budget status separately from A's completion budget.
+- **Ordering contract.** The pipeline is: validate request and budget →
+  preflight feasibility check → load and split the source → lexical candidates →
+  semantic sweep → embedding → optional rerank → dedupe and verify → assemble
+  with the drop sequence → chat. The chat POST is the last step. Therefore:
+  - anything preflight-detectable (invalid budget, budget below the mandatory
+    minimum, mandatory layers alone over the byte cap) starts zero chat, zero
+    embedding and zero rerank requests;
+  - anything that fails only during assembly starts zero chat requests, and the
+    embedding/rerank requests already spent are counted and reported rather than
+    retried or hidden.
 - Every remote embedding/rerank POST reserves a B-budget slot before it starts.
   When the budget is exhausted or usage is unknown, B stops further embedding/
   rerank calls and falls back to `lexical_only` or `embedding_only` with an
@@ -497,10 +509,10 @@ Assertions use exact counts/bytes/IDs rather than only a final status.
 | B-T18 | AC-NFR-02-4 | The same evaluation set at an 8,000-character budget: `degraded_budget` is explicit; hybrid and lexical-only recall are reported separately and are not lower than the 8k baseline; not pooled with 120k. |
 | B-T19 | AC-INV-05-3 | Change the source after a passage reference is produced: with content revision, the old revision is stale; without it, the text hash mismatch is stale; old text is never presented as current; status `stale_source`. |
 | B-T20 | AC-FR-02-11 | A `PassageRef` JSON contract test: required fields present, ID parses back to contentId/source/locator/sentence range, text hash is lowercase SHA-256, and C can re-read the source without trusting model output. |
-| B-T21 | AC-INV-04-4 | Over-budget candidate set: drop lowest-scored whole sentence/segment and recompute; then drop summary; then drop oldest history turn; if still over, `context_budget_exceeded` and zero provider POST; assert exact drop order/counts. |
+| B-T21 | AC-INV-04-4 | Two halves. **Preflight:** budget below the mandatory minimum (constraint reminder + one minimum viable passage + locator) is rejected before candidate generation — assert zero chat POST, zero embedding requests and zero rerank requests, and assert the selector was never entered. **Post-embedding:** over-budget candidate set drops the lowest-scored whole sentence/segment and recomputes, then summary, then the oldest history turn; if still over, `context_budget_exceeded` with zero chat POST, the embedding/rerank request counts reported as spent, and no retry. Assert exact drop order/counts in both halves. |
 | B-T22 | INV-04 | History overflow: oldest whole turns dropped first, current user turn retained, constraint reminder re-injected before the task, final rune/byte counts within bounds. |
 | B-T23 | AC-FR-02-4, AC-NFR-02-1 | Summary material competes for the budget: the assembler never falls back to head/tail text, no-match remains explicit, and the summary layer never exceeds its cap. |
-| B-T24 | INV-04, B budget | Fake provider records every POST: lexical candidate generation makes zero completion POSTs; remote embedding/rerank calls are counted by B's own retrieval budget before start; A's ledger is never read or mutated; exceeding B's budget stops further provider calls and falls back with an explicit status. |
+| B-T24 | AC-INV-04-5, B budget | Fake provider records every completion POST **and** every embedding/rerank request separately. Lexical candidate generation and the sweep make zero completion POSTs; remote embedding/rerank calls are counted by B's own retrieval budget before start; A's ledger is never read or mutated; exceeding B's budget stops further provider calls and falls back with an explicit status. Rejected assembly: preflight path asserts chat=0, embedding=0, rerank=0; post-embedding path asserts chat=0, embedding/rerank equal the attempts already made and are reported, and no retry starts. |
 | B-T25 | INV-04, INV-05 | HTTP/SSE mapping for `invalid_budget`, `no_match`, `lexical_only`, `semantic_sweep_limited`, `pdf_ocr_unavailable`, `pdf_no_text`, `pdf_extracting`, `pdf_extract_failed`, `source_unverified`, `stale_source`, `context_budget_exceeded`: distinct status/copy, no generic provider error, no `event: done` on rejected assembly. `semantic_sweep_limited` must not be rendered as `no_match` and must not suppress a valid selected passage. |
 | B-T26 | AC-FR-02-12, AC-NFR-02-5 | Embedder unavailable, timeout, wrong dimension, invalid vector, or model identity mismatch: hybrid degrades to `lexical_only` with explicit status; no mixed vectors; INV-04/INV-05 still hold; report counts the degradation. |
 | B-T27 | AC-FR-02-10 | PDF variants: no text layer, local OCR missing, encrypted/corrupt file, extractor timeout, page-count mismatch: explicit `pdf_ocr_unavailable`/`pdf_no_text`/`pdf_extract_failed`; no fabricated page or sentence; zero chat POST when assembly fails. |
@@ -531,7 +543,7 @@ Assertions use exact counts/bytes/IDs rather than only a final status.
 | Unicode boundaries | B-T09, B-T17, B-T29 | Rune/byte/UTF-16 mismatch, broken emoji, split surrogate |
 | Forged/out-of-range locator | B-T15 | A synthesized passage or fabricated citation |
 | Stale source | B-T19, B-T28 | Old text presented as current evidence |
-| Over-budget assembly | B-T16, B-T21, B-T22 | Any over-budget provider request or silent truncation |
+| Over-budget assembly | B-T16, B-T21, B-T22, B-T24 | Any over-budget provider request, a chat POST after a rejected assembly, a hidden/unreported embedding request, or silent truncation |
 | PDF without text | B-T04, B-T27 | Fabricated PDF passage or silent OCR claim |
 | Embedding failure/mismatch | B-T26, B-T30 | Mixed vectors, silent hybrid claim, unbudgeted POSTs |
 | Bad embedding config/weights | B-T31, B-T32 | Wrong dimension/model silently used; all-zero/negative/NaN weights; key leak |
