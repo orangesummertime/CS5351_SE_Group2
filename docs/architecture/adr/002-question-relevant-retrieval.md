@@ -80,8 +80,9 @@ Use **server-side hybrid retrieval** at **sentence/segment granularity**:
    position-stratified sample of the whole document**: every ⌈N/S⌉-th
    sentence/segment in source order, where S is the effective sweep quota. The
    quota comes from a proportional split of both the request-slot and character
-   budgets (see "Semantic sweep share" below), so it is always nonnegative, never
-   exceeds the derived budget, and is reserved before lexical candidates rather
+   budgets, capped at the configured `sweepCandidates` (see "Semantic sweep
+   share" below), so it is always nonnegative, never exceeds `sweepCandidates` or
+   the derived budget, and is reserved before lexical candidates rather
    than taken from what the lexical stage leaves over. Every selection reports
    `sweepCoverage = S / N`; when `S < N` the status reports
    `semantic_sweep_limited`, and when the sweep share cannot hold one passage it
@@ -153,20 +154,29 @@ score is per content row, not per passage. See
   maxEmbeddingChars - questionChars)`. This is a real second limit: 191 is a
   request-slot ceiling, and passage lengths can bind first at
   `maxEmbeddingChars=100000`.
-- **Proportional, nonnegative shares.** The sweep share is a **ratio**, not a
-  subtraction, because subtracting can go negative or exceed the budget:
+- **Proportional, nonnegative, capped shares.** The sweep share is a **ratio**,
+  not a subtraction, because subtracting can go negative; and the result is
+  **capped at the configured quota**, because a pure proportional split can
+  exceed it when the request budget is large:
   `sweepRatio = sweepCandidates / (topK + sweepCandidates)`, `0` when the
   denominator is 0. Then
-  `sweepSlots = floor(embeddingSlotBudget * sweepRatio)` and
-  `lexicalSlots = embeddingSlotBudget - sweepSlots`; likewise
+  `sweepSlots = min(sweepCandidates, floor(embeddingSlotBudget * sweepRatio))` and
+  `lexicalSlots = min(topK, embeddingSlotBudget - sweepSlots)`; likewise
   `sweepChars = floor(embeddingCharBudget * sweepRatio)` and
-  `lexicalChars = embeddingCharBudget - sweepChars`. Every share is therefore
-  `>= 0`, `sweepSlots + lexicalSlots == embeddingSlotBudget`, and
-  `sweepChars + lexicalChars == embeddingCharBudget`. `topK` caps
-  `lexicalSlots` from above only; it never pushes the sum over the budget.
-  This holds for every configuration, including `maxEmbeddingRequests=1`, where
-  the budget is 7 slots and the shares are 3 sweep / 4 lexical rather than a
-  negative lexical share and an over-budget sweep.
+  `lexicalChars = embeddingCharBudget - sweepChars`. The invariants are:
+  `sweepSlots >= 0`, `lexicalSlots >= 0`, `sweepSlots <= sweepCandidates`,
+  `lexicalSlots <= topK`, `sweepSlots + lexicalSlots <= embeddingSlotBudget`, and
+  `sweepChars + lexicalChars == embeddingCharBudget` with both `>= 0`.
+  `sweepCandidates` and `topK` are hard candidate-count ceilings: a larger
+  request budget can never force more candidates than configured. **Unused slots
+  stay spare** (`embeddingSlotBudget - sweepSlots - lexicalSlots`); they are not
+  redistributed into extra sweep or lexical candidates beyond the configured
+  caps. The sweep's character allowance is an upper bound it may not fully use
+  once its count cap binds. This holds for every configuration: at
+  `maxEmbeddingRequests=1` the budget is 7 slots and the shares are 3 sweep / 4
+  lexical; at `maxEmbeddingRequests=25` the budget is 199 slots and the sweep is
+  capped at 90 (not the uncapped `floor(199*90/190)=94`), lexical at 100, leaving
+  9 spare slots.
 - **Both limits protect the sweep.** Each side selects up to its own slot count
   and stops when its own character allowance is used. Character pressure
   therefore shrinks both sides proportionally instead of consuming the sweep

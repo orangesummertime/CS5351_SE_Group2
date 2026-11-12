@@ -341,15 +341,18 @@ requirements:
           them has nonzero coverage, so no "shortlist too small" or "zero
           coverage" condition holds; the sweep nevertheless runs. Its share is
           proportional and reserved from both the request-slot and character
-          budgets, never taken from what the lexical stage leaves over, and it is
-          always nonnegative with the two shares summing to the derived budget.
-          Character pressure shrinks both shares proportionally instead of
-          consuming the sweep. When the sample lands on the gold segment, hybrid
-          selects it and lexical-only misses it. When it does not, or when the
-          computed sweep share cannot hold one passage, the result reports
-          semantic_sweep_limited with sweepCoverage and a zero-coverage reason,
-          and the user-facing copy and evaluation report present the case as a
-          coverage limitation rather than a semantic miss or no_match.
+          budgets, never taken from what the lexical stage leaves over. The
+          shares are nonnegative, capped at the configured sweepCandidates and
+          topK, and sum to at most the derived slot budget with any remainder
+          left spare; a larger request budget never raises the candidate counts
+          above those caps. Character pressure shrinks both shares proportionally
+          instead of consuming the sweep. When the sample lands on the gold
+          segment, hybrid selects it and lexical-only misses it. When it does
+          not, or when the computed sweep share cannot hold one passage, the
+          result reports semantic_sweep_limited with sweepCoverage and a
+          zero-coverage reason, and the user-facing copy and evaluation report
+          present the case as a coverage limitation rather than a semantic miss
+          or no_match.
         test: B-T40
     tradeoff: >-
       Hybrid retrieval can use a local model, a custom endpoint or an Aliyun

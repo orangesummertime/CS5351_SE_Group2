@@ -157,14 +157,18 @@ Default B budget: `maxEmbeddingRequests=24`, `maxEmbeddingChars=100000`,
 The candidate budget is derived on two axes: `24 * 8 - 1` (question) = **191
 request slots**, and `maxEmbeddingChars` minus the question as the character
 budget. Both are split by the same ratio `sweepCandidates / (topK +
-sweepCandidates)` = 90/190, so the shares are `sweepSlots = floor(191 * 90/190) =
-90` and `lexicalSlots = 101` (capped by `topK=100`), and the character budget
-splits about 47,300 sweep / 52,600 lexical. Shares are nonnegative and always sum
-to the derived budget, so a small configuration such as
-`maxEmbeddingRequests=1` yields 3 sweep / 4 lexical out of 7 rather than a
-negative share. Character pressure shrinks both shares proportionally; it never
-takes the sweep's allowance, and if the sweep share cannot hold one passage the
-result reports `semantic_sweep_limited` with reason `sweep_zero_slots`.
+sweepCandidates)` = 90/190, then capped at the configured counts:
+`sweepSlots = min(sweepCandidates, floor(191 * 90/190)) = 90` and
+`lexicalSlots = min(topK, 191 - 90) = 100`, and the character budget splits about
+47,300 sweep / 52,600 lexical. Shares are nonnegative, capped at `sweepCandidates`
+and `topK`, and sum to at most the slot budget with any remainder left spare. A
+small configuration such as `maxEmbeddingRequests=1` yields 3 sweep / 4 lexical
+out of 7 rather than a negative share; a large one such as
+`maxEmbeddingRequests=25` (199 slots) still yields 90 sweep / 100 lexical with 9
+spare, never the uncapped 94 sweep. Character pressure shrinks both shares
+proportionally; it never takes the sweep's allowance, and if the sweep share
+cannot hold one passage the result reports `semantic_sweep_limited` with reason
+`sweep_zero_slots`.
 These are conservative defaults; the user can raise/lower them, and the
 evaluation report must record the actual values. If the candidate text exceeds
 `maxEmbeddingChars`, the selector deterministically reduces the effective

@@ -193,17 +193,21 @@ Determinism rules:
   configuration; do not pool OCR and native text pages without labeling them.
 - Record `sweepCandidates`, `sweepRatio`, the derived `embeddingSlotBudget` and
   `embeddingCharBudget`, the resulting `sweepSlots`/`lexicalSlots` and
-  `sweepChars`/`lexicalChars`, the sampled index set, `stride`, `sweepCoverage`,
-  and any zero-coverage reason (`sweep_zero_slots`,
-  `sweep_disabled_by_config`). A run with `sweepCoverage < 1` must not be
-  presented as an unbounded paraphrase-recall claim: report the zero-overlap
-  recall **at that coverage**, and report the distractor-saturated subset
-  separately from the degenerate-lexical subset.
+  `sweepChars`/`lexicalChars`, the spare slot count, the sampled index set,
+  `stride`, `sweepCoverage`, and any zero-coverage reason (`sweep_zero_slots`,
+  `sweep_disabled_by_config`). Assert and report the cap invariants
+  `sweepSlots <= sweepCandidates` and `lexicalSlots <= topK`. A run with
+  `sweepCoverage < 1` must not be presented as an unbounded paraphrase-recall
+  claim: report the zero-overlap recall **at that coverage**, and report the
+  distractor-saturated subset separately from the degenerate-lexical subset.
 - Run at least one **budget-starved configuration** (for example
-  `maxEmbeddingRequests=1`) and one **character-bound configuration**, and report
-  the resulting shares. These runs exist to prove the shares stay nonnegative and
-  within budget, and that character pressure does not silently take the sweep's
-  allowance; they are not part of the 120k recall denominator.
+  `maxEmbeddingRequests=1`), one **character-bound configuration**, and one
+  **high-budget configuration** (for example `maxEmbeddingRequests=25` with
+  `topK=100`, `sweepCandidates=90`), and report the resulting shares. These runs
+  exist to prove the shares stay nonnegative and within budget, that the sweep
+  never exceeds `sweepCandidates` even when the request budget is large, and that
+  character pressure does not silently take the sweep's allowance; they are not
+  part of the 120k recall denominator.
 
 ## 6. Report format
 

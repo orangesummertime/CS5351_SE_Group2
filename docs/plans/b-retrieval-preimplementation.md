@@ -313,16 +313,29 @@ they can never go negative or overflow:
 embeddingSlotBudget = max(0, maxEmbeddingRequests * batchSize - 1)   // 1 = question
 embeddingCharBudget = max(0, maxEmbeddingChars - questionChars)
 sweepRatio          = sweepCandidates / (topK + sweepCandidates)    // 0 if denom 0
-sweepSlots          = floor(embeddingSlotBudget * sweepRatio)
-lexicalSlots        = embeddingSlotBudget - sweepSlots               // >= 0
+sweepSlots          = min(sweepCandidates, floor(embeddingSlotBudget * sweepRatio))
+lexicalSlots        = min(topK, embeddingSlotBudget - sweepSlots)
 sweepChars          = floor(embeddingCharBudget * sweepRatio)
 lexicalChars        = embeddingCharBudget - sweepChars               // >= 0
 ```
 
-A subtraction like `min(topK, budget - sweepCandidates)` is not used: with
-`maxEmbeddingRequests=1` and `sweepCandidates=90` it yields a negative lexical
-share and then assigns 90 sweep candidates to a 7-slot budget. The proportional
-form gives 3 sweep / 4 lexical out of 7.
+Two guards, for the two failure modes this section has had:
+- A subtraction like `min(topK, budget - sweepCandidates)` is not used: with
+  `maxEmbeddingRequests=1` and `sweepCandidates=90` it yields a negative lexical
+  share and then assigns 90 sweep candidates to a 7-slot budget. The proportional
+  form gives 3 sweep / 4 lexical out of 7.
+- The proportional result is **capped at the configured quota**: without the cap,
+  `maxEmbeddingRequests=25` gives a 199-slot budget and `floor(199*90/190)=94`
+  sweep slots, exceeding the requested `sweepCandidates=90`. With the cap the
+  sweep is 90, lexical is `min(100, 199-90)=100`, and 9 slots stay spare. A larger
+  request budget widens the spare headroom but never the candidate counts.
+
+Invariants: `sweepSlots >= 0`, `lexicalSlots >= 0`, `sweepSlots <= sweepCandidates`,
+`lexicalSlots <= topK`, `sweepSlots + lexicalSlots <= embeddingSlotBudget`, and
+`sweepChars + lexicalChars == embeddingCharBudget` with both `>= 0`. **Unused slots
+stay spare**; they are not turned into extra candidates beyond `sweepCandidates`
+or `topK`. The sweep's character allowance is an upper bound it may not fully use
+once its count cap binds.
 
 Each side selects up to its own slot count and stops when its own character
 allowance is exhausted. Character pressure therefore shrinks both sides
@@ -331,11 +344,11 @@ distractors cannot starve the sweep back to zero.
 
 With the defaults (`maxEmbeddingRequests=24`, `batchSize=8`, `topK=100`,
 `sweepCandidates=90`, `maxEmbeddingChars=100000`): slot budget **191**,
-`sweepRatio = 90/190`, `sweepSlots = 90`, `lexicalSlots = 101` capped to 100 — 190
-of 191 slots used, one spare; character split about 47,300 sweep / 52,600
-lexical, which holds 90 passages of roughly 500 runes. A document longer than 90
-sampled segments reports `semantic_sweep_limited` with `sweepCoverage = S/N`.
-`topK` only caps `lexicalSlots` from above; it never pushes the total over budget.
+`sweepRatio = 90/190`, `sweepSlots = min(90, 90) = 90`,
+`lexicalSlots = min(100, 101) = 100` — 190 of 191 slots used, one spare; character
+split about 47,300 sweep / 52,600 lexical, which holds 90 passages of roughly 500
+runes. A document longer than 90 sampled segments reports `semantic_sweep_limited`
+with `sweepCoverage = S/N`.
 
 **Zero-coverage outcome.** If `sweepCandidates=0`, or the computed `sweepSlots` or
 `sweepChars` cannot hold one passage, then `S=0` and the result carries
@@ -571,7 +584,7 @@ Assertions use exact counts/bytes/IDs rather than only a final status.
 | B-T30 | AC-NFR-02-3, AC-FR-02-12 | Embedding cache: same `(contentId, sourceVersion, passageId, modelId, dimensions)` hits; model/source/dimension change misses; no vector from a different dimension/model is used. |
 | B-T31 | AC-FR-02-13 | Embedding settings: local OpenAI-compatible, custom remote and Bailian preset; custom base URL/key/model/dimensions/batch/text_type/instruct; test connection validates returned dimension; key is masked and never returned; a wrong dimension/model is rejected with an actionable error. |
 | B-T32 | AC-FR-02-14 | Custom weights: lexical/embedding/rerank each in [0,1], at least one positive; sum is normalized; all-zero/negative/NaN/Inf rejected; changing weights changes ranking deterministically and is recorded in the report. |
-| B-T33 | AC-FR-02-15 | B retrieval budget: `maxEmbeddingRequests`, `maxRerankRequests`, `maxEmbeddingChars`; statuses `completed`/`embedding_budget_limited`/`embedding_budget_exhausted`/`rerank_budget_exhausted`/`embedding_usage_unknown`; A's ledger is untouched; limited/exhausted falls back with explicit status; enabling rerank with zero rerank budget requires a positive value or keeps rerank off. **Request-budget validation rule:** `maxEmbeddingRequests`/`maxRerankRequests` accept 0 as "off" (embedding off → `lexical_only`; rerank off → no rerank POST); a negative, non-integer, NaN or Inf value is rejected as `invalid_budget` before any embedding/rerank request; `maxEmbeddingChars` must be a positive integer. **Low-budget matrix (the share arithmetic must never go negative or overflow):** `maxEmbeddingRequests=1, batchSize=8, sweepCandidates=90` gives `embeddingSlotBudget=7`, `sweepSlots=3`, `lexicalSlots=4` — assert both are `>= 0`, `sweepSlots + lexicalSlots == 7`, `sweepSlots + lexicalSlots + 1 question <= 8` (one request), and that the observed request count is 1. `maxEmbeddingRequests=0` gives a 0 slot budget: assert no embedding request at all, `lexical_only`, `embedding_budget_exhausted`. `maxEmbeddingRequests=-1` asserts `invalid_budget` before any request. `sweepCandidates=0` asserts `semantic_sweep_limited` with reason `sweep_disabled_by_config` and no zero-overlap claim. Character-bound zero-sweep case: `maxEmbeddingChars=1040`, question 40 chars, 500-rune passages gives `embeddingCharBudget=1000`, `sweepChars=473 < 500` and `lexicalChars=527 >= 500` — assert reason `sweep_zero_slots`, `sweepCoverage=0`, exactly one lexical passage embedded and zero sweep candidates. |
+| B-T33 | AC-FR-02-15 | B retrieval budget: `maxEmbeddingRequests`, `maxRerankRequests`, `maxEmbeddingChars`; statuses `completed`/`embedding_budget_limited`/`embedding_budget_exhausted`/`rerank_budget_exhausted`/`embedding_usage_unknown`; A's ledger is untouched; limited/exhausted falls back with explicit status; enabling rerank with zero rerank budget requires a positive value or keeps rerank off. **Request-budget validation rule:** `maxEmbeddingRequests`/`maxRerankRequests` accept 0 as "off" (embedding off → `lexical_only`; rerank off → no rerank POST); a negative, non-integer, NaN or Inf value is rejected as `invalid_budget` before any embedding/rerank request; `maxEmbeddingChars` must be a positive integer. **Low-budget matrix (the share arithmetic must never go negative or overflow):** `maxEmbeddingRequests=1, batchSize=8, sweepCandidates=90` gives `embeddingSlotBudget=7`, `sweepSlots=3`, `lexicalSlots=4` — assert both are `>= 0`, `sweepSlots + lexicalSlots == 7`, `sweepSlots + lexicalSlots + 1 question <= 8` (one request), and that the observed request count is 1. `maxEmbeddingRequests=0` gives a 0 slot budget: assert no embedding request at all, `lexical_only`, `embedding_budget_exhausted`. `maxEmbeddingRequests=-1` asserts `invalid_budget` before any request. `sweepCandidates=0` asserts `semantic_sweep_limited` with reason `sweep_disabled_by_config` and no zero-overlap claim. Character-bound zero-sweep case: `maxEmbeddingChars=1040`, question 40 chars, 500-rune passages gives `embeddingCharBudget=1000`, `sweepChars=473 < 500` and `lexicalChars=527 >= 500` — assert reason `sweep_zero_slots`, `sweepCoverage=0`, exactly one lexical passage embedded and zero sweep candidates. **High-budget cap case:** `topK=100, sweepCandidates=90, batchSize=8, maxEmbeddingRequests=25` gives `embeddingSlotBudget=199`; assert `sweepSlots == 90` (the configured quota, **not** the uncapped `floor(199*90/190)=94`), `lexicalSlots == 100`, `sweepSlots + lexicalSlots == 190 <= 199`, and 9 spare slots; repeat with `maxEmbeddingRequests=100` (budget 799) and assert the sweep is still 90 and lexical still 100, so a larger request budget never exceeds the configured candidate counts. |
 | B-T34 | AC-FR-02-16 | PaddleOCR adapter: default local fake runtime (no cloud/token); explicit cloud fake job API submit/poll/done, JSONL parse, per-page markdown text; token redacted; page-count mismatch/timeout/failed state -> `pdf_extract_failed`; no fabricated text; no real network/token. |
 | B-T35 | AC-NFR-02-6 | Config persistence/reload: provider, base URL, masked key, model, dimensions, batch, weights, rerank settings and budgets survive a save/reload; no key in responses/logs; the evaluation report records the exact config. |
 | B-T36 | AC-FR-02-17 | Optional rerank: off -> zero rerank POST; Bailian/custom -> `relevance_score` combined with weights; rerank failure -> `rerank_unavailable` and fallback; rerank requests counted by B budget; scores are not compared across requests. |

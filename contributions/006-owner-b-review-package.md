@@ -6,13 +6,15 @@
 - **Scope:** B baseline, draft FR-02/NFR-02/INV-04/INV-05, ADR-002, hybrid
   retrieval test plan, evaluation protocol, PDF extraction design, debt
   register, course test layout and AI-use disclosure.
-- **Review:** Three rounds of CHANGES REQUIRED so far: the first on `55ec38b`
+- **Review:** Four rounds of CHANGES REQUIRED so far: the first on `55ec38b`
   (four findings and two consistency nits), the second on `78efdca` (the sweep
-  trigger could stay silent when lexical distractors fill the shortlist), and the
+  trigger could stay silent when lexical distractors fill the shortlist), the
   third on `66fc582` (the share arithmetic could go negative or overflow, and
-  character pressure could starve the protected sweep). All three are addressed
-  below and in the follow-up commits; a fourth review is pending. No
-  implementation, evaluation run or approval is claimed.
+  character pressure could starve the protected sweep), and the fourth on
+  `062a21d` (the uncapped proportional split could exceed the configured
+  `sweepCandidates` quota at high request budgets). All four are addressed below
+  and in the follow-up commits; a fifth review is pending. No implementation,
+  evaluation run or approval is claimed.
 
 > Numbering note: this package was written as 005 while only 001 existed on
 > `main` and A's 002–004 were still unmerged. A's records have since merged, so
@@ -258,6 +260,43 @@ request budgets accept 0 as off and reject negative/non-integer values.
 The example configurations were also evaluated numerically before the commit: for
 `requests=1`, `requests=0`, `sweepCandidates=0` and a tight character budget, the
 shares stayed nonnegative and summed to the derived budget in every case.
+
+## Fourth review round (on `062a21d`)
+
+The reviewer accepted the low-budget and character-pressure fixes and found one
+remaining high-budget defect: the uncapped proportional split
+`sweepSlots = floor(embeddingSlotBudget * sweepRatio)` can exceed the configured
+`sweepCandidates`. With `topK=100`, `sweepCandidates=90`, `batchSize=8`,
+`maxEmbeddingRequests=25`, the slot budget is 199 and the formula gives
+`floor(199*90/190)=94` sweep slots — more than the requested quota of 90, and the
+gap widens with a larger request budget.
+
+The fix keeps `sweepCandidates` as a count quota (rather than redefining it as a
+ratio weight) and caps the effective shares:
+
+```text
+sweepSlots   = min(sweepCandidates, floor(embeddingSlotBudget * sweepRatio))
+lexicalSlots = min(topK, embeddingSlotBudget - sweepSlots)
+```
+
+The invariants are now `sweepSlots >= 0`, `lexicalSlots >= 0`,
+`sweepSlots <= sweepCandidates`, `lexicalSlots <= topK`, and
+`sweepSlots + lexicalSlots <= embeddingSlotBudget`. **Unused slots stay spare**;
+they are not redistributed into extra candidates beyond the configured caps, so a
+larger request budget adds headroom, never more candidates than the user asked
+for. The reviewer's case now gives 90 sweep / 100 lexical with 9 spare (not 94
+sweep); `maxEmbeddingRequests=100` (799 slots) still gives 90 / 100 with 609 spare.
+The character split stays proportional, and the sweep's count cap is what bounds
+it. The ADR, plan, requirements (AC-FR-02-20), evaluation protocol and provider
+notes all state the cap; B-T33 gains a high-budget case asserting
+`sweepSlots == sweepCandidates` at `maxEmbeddingRequests=25` and `=100`, and the
+evaluation protocol now requires a high-budget run alongside the budget-starved
+and character-bound runs.
+
+The capped formula was evaluated numerically for `requests=25`, `requests=100`,
+the defaults, `requests=1`, `requests=0` and `sweepCandidates=0`; in every case the
+shares were nonnegative, within their configured caps, and summed to at most the
+slot budget.
 
 ## Presentation explanation
 
