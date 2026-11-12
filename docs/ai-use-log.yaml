@@ -72,6 +72,8 @@ entries:
         - "docs/ai-use-log.yaml (this file)"
       executed:
         - "git branch/status/log/ls-remote, git checkout main, git checkout -b owner/b-retrieval"
+        - "git fetch origin --prune, git merge origin/main, git push origin owner/b-retrieval"
+        - "GitHub API read existing PR #1 and create/update docs-only PR #2"
         - "go test ./... -count=1 (full Go suite)"
         - "go test focused library tests, FTS probe and context-byte probe via -overlay"
         - "cd src/web && npm test (full Vitest suite)"
