@@ -483,11 +483,15 @@ requirements:
           either bound.
         test: B-T16
       - id: AC-INV-04-2
-        scenario: "The budget is 0, negative, non-integer, NaN/Inf, or exceeds the proposed maximum."
+        scenario: >-
+          The context assembly budget (maxChars/BudgetRunes) is 0, negative,
+          non-integer, NaN/Inf, or exceeds the proposed maximum. This criterion
+          scopes the assembly budget only; the embedding/rerank request budgets
+          are validated separately (0 = off, negative/non-integer = invalid).
         expected: >-
           The request is rejected before retrieval, embedding or provider work
-          with an explicit invalid_budget status; no zero or negative limit is
-          treated as unlimited.
+          with an explicit invalid_budget status; no zero or negative assembly
+          limit is treated as unlimited.
         test: B-T10
       - id: AC-INV-04-3
         scenario: >-

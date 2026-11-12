@@ -237,12 +237,23 @@ result reports `semantic_sweep_limited` with reason `sweep_zero_slots` and
 
 Tests: B-T33 gains a low-budget matrix (`maxEmbeddingRequests=1` → 3/4 out of 7,
 nonnegative, sums exact, one request observed; `maxEmbeddingRequests=0` →
-`lexical_only` with `embedding_budget_exhausted`; `sweepCandidates=0` →
-`sweep_disabled_by_config`; one-passage-tall `maxEmbeddingChars` →
-`sweep_zero_slots`), and B-T40 gains Variant C where the character budget binds
-before the slots and the sweep must still receive at least one passage while the
-lexical share shrinks. The evaluation protocol requires both a budget-starved and
-a character-bound run, reported outside the 120k recall denominator.
+`lexical_only` with `embedding_budget_exhausted`; `maxEmbeddingRequests=-1` →
+`invalid_budget`; `sweepCandidates=0` → `sweep_disabled_by_config`; a
+character-bound fixture with `maxEmbeddingChars=1040` → `sweep_zero_slots` with one
+lexical passage and zero sweep candidates), and B-T40 gains Variant C where the
+character budget binds before the slots: both shares shrink proportionally, the
+sweep still receives at least one passage, and it is never zeroed while lexical
+candidates remain embedded. The evaluation protocol requires both a budget-starved
+and a character-bound run, reported outside the 120k recall denominator.
+
+A self-audit of this revision also caught two wording/scope defects, fixed in the
+same follow-up: (a) B-T40 Variant C and this record initially said "the lexical
+share shrinks instead of the sweep share", which contradicted the proportional
+rule — both shares shrink; the sweep is protected from being *zeroed*, not from
+shrinking. (b) The request-budget rule "0 = off" was not previously defined and
+could be read against AC-INV-04-2/B-T10 ("budget 0 → invalid_budget"); those are
+now explicitly scoped to the *context assembly* budget, while the embedding/rerank
+request budgets accept 0 as off and reject negative/non-integer values.
 
 The example configurations were also evaluated numerically before the commit: for
 `requests=1`, `requests=0`, `sweepCandidates=0` and a tight character budget, the
