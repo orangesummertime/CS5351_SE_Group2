@@ -548,7 +548,11 @@ completion start and must be reserved under A's rule.
 
 B's default is local-first: local OpenAI-compatible embedding (recommended
 bge-m3/1024), top-K 100, weights 0.35/0.65/0, rerank off, B budget 16
-embedding requests / 60,000 characters. A remote/custom/
+embedding requests / 60,000 characters. *(Design updated after this audit: the
+default is now 24 requests / 100,000 characters with a protected 90-candidate
+semantic sweep, so that a zero-overlap paraphrase can reach the embedder; see
+the [implementation plan](../plans/b-retrieval-preimplementation.md#relation-to-as-budget-b-has-a-separate-retrieval-budget)
+and ADR-002. The audit findings above are unchanged by that update.)* A remote/custom/
 Bailian provider is opt-in. B's hybrid path adds `/embeddings` and optional
 rerank POSTs when a remote provider is used; those are **not** covered by A's
 current completion-only invariant. To avoid touching A's branch, B uses its

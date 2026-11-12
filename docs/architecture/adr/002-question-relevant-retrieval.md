@@ -67,21 +67,27 @@ Use **server-side hybrid retrieval** at **sentence/segment granularity**:
 1. **Lexical candidate generation** runs locally over the normalized source.
    It is deterministic, fast and makes no provider call. It returns the top-K
    candidate sentences/segments.
-1b. **Bounded semantic sweep.** A lexical shortlist cannot contain a passage
-   that shares no query term with the question, so a paraphrase or a
-   cross-language question would never reach the embedding stage. When an
-   embedder is configured, the selector therefore unions the lexical shortlist
-   with a **deterministic, budget-bounded sample of the whole document**: every
-   ⌈N/S⌉-th sentence/segment over source order, where S is bounded by
-   `maxSweepCandidates` (default 200) and by the remaining
-   `maxEmbeddingChars`/`maxEmbeddingRequests`. The sweep runs whenever the
-   lexical stage yields fewer than `minLexicalCandidates` (default 20) or the
-   best lexical candidate has zero distinct query-term coverage. When the sweep
-   cannot cover the whole document inside the B budget, the sample stays
-   position-stratified, the status reports `semantic_sweep_limited`, and the
-   evaluation reports that limitation instead of claiming unlimited paraphrase
-   recall. With no embedder configured the path stays `lexical_only` and no
-   paraphrase claim is made.
+1b. **Bounded semantic sweep — unconditional.** A lexical shortlist cannot
+   contain a passage that shares no query term with the question, so a
+   paraphrase or a cross-language question would never reach the embedding
+   stage. A conditional sweep does not close this gap either: a long document
+   with many lexical distractors fills the shortlist with query-term matches, so
+   any "shortlist too small / no coverage" trigger stays silent while the
+   zero-overlap answer is still excluded. The sweep therefore runs **whenever an
+   embedder is configured**, with no trigger condition other than that the
+   candidate budget is non-zero.
+   The selector unions the lexical shortlist with a **deterministic,
+   position-stratified sample of the whole document**: every ⌈N/S⌉-th
+   sentence/segment in source order, where S is the effective sweep quota. S is
+   `min(sweepCandidates, embeddingCandidateBudget - effectiveLexicalCandidates)`,
+   so the sweep always receives a protected share of the candidate budget rather
+   than whatever the lexical stage leaves over. Every selection reports
+   `sweepCoverage = S / N`, and when `S < N` the status reports
+   `semantic_sweep_limited`. The zero-overlap recall claim is therefore bounded
+   by that coverage and is never stated as a guarantee: the requirement, the
+   evaluation report and the user-facing copy must present `sweepCoverage`
+   instead of claiming that any paraphrase is recoverable. With no embedder
+   configured the path stays `lexical_only` and no paraphrase claim is made.
 2. **Embedding rerank** embeds the question and the unioned candidate set with a
    user-selected embedder, then scores cosine similarity. The user can choose a
    local OpenAI-compatible server, a custom remote endpoint/key/model, or an
@@ -138,18 +144,26 @@ score is per content row, not per passage. See
 
 ## Hybrid scoring and model pinning
 
-- **Candidate limit:** top-K is configurable (default 100, accepted range
-  20–1,000), so the embedding cost and the test surface stay bounded. The same
-  default is used by the plan, the settings UI and the evaluation report; a
-  document that needs more candidates raises top-K or the sweep bound, never an
-  undocumented constant.
-- **Semantic sweep bound:** `maxSweepCandidates` is configurable (default 200,
-  accepted range 20–2,000) and is additionally clamped by the remaining
-  `maxEmbeddingChars`/`maxEmbeddingRequests`. `minLexicalCandidates` defaults to
-  20. The sweep is a deterministic position-stratified sample, not a random one,
-  so a frozen-vector replay stays byte-identical. The recall claim is therefore
-  "paraphrases reachable inside the sweep bound", not "any paraphrase in any
-  document size".
+- **Candidate limit:** the lexical shortlist size is `topK` (default 100,
+  accepted range 20–1,000). The embedding candidate budget is derived, not a
+  separate guess: `embeddingCandidateBudget = maxEmbeddingRequests * batchSize -
+  1` (one slot for the question), further clamped by `maxEmbeddingChars` and by
+  the actual passage lengths. This is the number that bounds both the lexical
+  share and the sweep share.
+- **Semantic sweep share:** `sweepCandidates` is the requested sweep quota
+  (default 90, accepted range 0–1,000). The effective lexical share is
+  `min(topK, embeddingCandidateBudget - sweepCandidates)` and the effective sweep
+  is `min(sweepCandidates, embeddingCandidateBudget - effectiveLexicalShare)`.
+  With the defaults (`maxEmbeddingRequests=24`, `batchSize=8`,
+  `maxEmbeddingChars=100000`) the budget is 191 candidates: 100 lexical + 90
+  sweep + 1 question = 191, which is the whole budget with no slack, so a
+  document longer than the sweep sample reports `semantic_sweep_limited`. The
+  sweep is a deterministic position-stratified sample, not a random one, so a
+  frozen-vector replay stays byte-identical.
+- **What the claim is:** recall for a zero-overlap paraphrase is bounded by
+  `sweepCoverage = S/N`. The design guarantees a bounded, deterministic path
+  into the candidate set and reports how much of the document that path covered;
+  it does not guarantee that any given zero-overlap passage is sampled.
 - **Score:** `hybrid = lexicalWeight * lexical_norm + embeddingWeight * cosine
   + rerankWeight * rerank_norm`. Weights are user-configurable, each in `[0,1]`;
   at least one is positive; they are normalized to sum 1. Defaults: 0.35/0.65/0
@@ -173,9 +187,10 @@ score is per content row, not per passage. See
 ### Embedding and rerank settings
 
 The default is **local-first**: a local OpenAI-compatible server, recommended
-`bge-m3` at 1024 dimensions, batch 8, top-K 100, weights 0.35 lexical / 0.65
-embedding / 0 rerank. The default B budget is 16 embedding requests, 60,000
-embedding characters and 0 rerank requests; the user can override every value
+`bge-m3` at 1024 dimensions, batch 8, top-K 100, sweep 90 candidates, weights
+0.35 lexical / 0.65 embedding / 0 rerank. The default B budget is 24 embedding
+requests, 100,000 embedding characters and 0 rerank requests, which covers the
+100 lexical + 90 sweep + 1 question candidate set; the user can override every value
 and switch to a custom remote or Aliyun Bailian provider. No model is silently downloaded; if the local
 server/model is unavailable, the status is `embedding_unavailable` and retrieval
 falls back to `lexical_only`.
@@ -326,7 +341,7 @@ must not silently pretend the full context was used.
 3. **Lexical candidates:** score exact normalized phrase, distinct query-term
    coverage, saturating term frequency and proximity; keep the configured top-K
    (default 100, accepted range 20–1,000). This is the lexical shortlist that
-   step 3b may extend; it is a different knob from `maxSweepCandidates`.
+   step 3b may extend; it is a different knob from `sweepCandidates`.
 4. **Embedding/rerank:** embed the question and candidates; validate dimension
    and model identity; compute cosine; optionally call the rerank provider;
    combine with the configured/normalized weights.
@@ -539,13 +554,17 @@ a migration that has already run. B-T38 covers the old-DB upgrade/backfill.
 
 ### Positive
 
-- Hybrid retrieval recovers literal middle answers and, within the documented
-  sweep bound, semantic paraphrases that the head/tail baseline and
+- Hybrid retrieval recovers literal middle answers and, as far as the reported
+  `sweepCoverage` reaches, semantic paraphrases that the head/tail baseline and
   lexical-only paths miss.
-- The sweep path is what makes a zero-overlap paraphrase reachable at all; the
-  claim is explicitly bounded by `maxSweepCandidates` and the B embedding
-  budget, and `semantic_sweep_limited` reports when the sample could not cover
-  the whole document.
+- The unconditional sweep is what makes a zero-overlap paraphrase reachable at
+  all, including in a document that is full of lexical distractors. The claim is
+  explicitly bounded by `sweepCoverage`; `semantic_sweep_limited` reports when
+  the sample could not cover the whole document, so a miss caused by sampling is
+  visible instead of being reported as a semantic failure.
+- The cost is a larger default embedding budget (24 requests / 100,000
+  characters instead of 16 / 60,000), because the sweep quota is protected
+  rather than taken from whatever the lexical stage leaves over.
 - Sentence/segment granularity gives C a precise locator and avoids dumping
   whole article blocks into the context.
 - Server-side PDF extraction makes PDF chat compatible with the same verification

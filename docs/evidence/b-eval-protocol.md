@@ -61,9 +61,15 @@ WANG Jiaqi prepares and confirms:
   cross-language pair. These are the fixtures behind AC-FR-02-19 / B-T39; they
   must be labeled before the run and must be reported separately so a lexical
   miss is not hidden inside the aggregate recall;
+- at least two **distractor-saturated** documents: each contains 20 or more
+  passages that do contain the query terms, so the lexical shortlist is full and
+  its best candidate has nonzero coverage, plus the only correct answer as a
+  zero-overlap middle passage. These are the AC-FR-02-20 / B-T40 fixtures. One
+  of them must place the gold segment on a sampled index and one off it, so both
+  the reachable and the coverage-limited outcome are measured;
 - at least one document large enough that the deterministic semantic sweep is
-  clamped by `maxEmbeddingChars`/`maxEmbeddingRequests`; the run must report
-  `semantic_sweep_limited` and record the sampled index set and its size;
+  clamped by the candidate budget; the run must report `semantic_sweep_limited`
+  and record the sampled index set and its size;
 - no real user data, credentials, cookies or private URLs; use existing fixtures
   or manually constructed text.
 
@@ -153,7 +159,8 @@ with the same code-point counting rule, not the raw `String.length` value.
 
 The stable default configuration is local-first: local OpenAI-compatible
 embedding (`bge-m3`/1024 recommended), top-K 100, weights 0.35/0.65/0, rerank
-off, B budget 16 embedding requests / 60,000 characters, local PaddleOCR. The
+off, B budget 24 embedding requests / 100,000 characters (191 candidates: 100
+lexical + 90 sweep + question), local PaddleOCR. The
 evaluation may use a different approved configuration, but it must record the
 deviation.
 
@@ -175,15 +182,18 @@ Determinism rules:
 - A model or dimension change invalidates the vector cache and requires a rerun.
 - Record `providerKind` (local/custom/Bailian), endpoint family (not the key),
   `embeddingModel`, `dimensions`, `batchSize`, `textType`, `instruct`,
-  `modelHash`, `vectorHash`, `topK` (default 100), `minLexicalCandidates`,
-  `maxSweepCandidates` (default 200, a separate knob from `topK`),
-  `hybridWeights`, rerank model/`topN`/weight
+  `modelHash`, `vectorHash`, `topK` (default 100), `sweepCandidates`
+  (default 90), the derived `embeddingCandidateBudget` and the effective lexical
+  and sweep shares, `hybridWeights`, rerank model/`topN`/weight
   (if enabled) and the B budget limits in the report.
 - If a PDF subset uses PaddleOCR, record the extractor version and OCR job
   configuration; do not pool OCR and native text pages without labeling them.
-- Record `minLexicalCandidates`, `maxSweepCandidates`, the sweep sampled index
-  set and whether `semantic_sweep_limited` was reported. A sweep-clamped run must
-  not be presented as an unbounded paraphrase-recall claim.
+- Record `sweepCandidates`, the derived `embeddingCandidateBudget`, the effective
+  lexical share and sweep share, the sampled index set, `stride`,
+  `sweepCoverage` and whether `semantic_sweep_limited` was reported. A run with
+  `sweepCoverage < 1` must not be presented as an unbounded paraphrase-recall
+  claim: report the zero-overlap recall **at that coverage**, and report the
+  distractor-saturated subset separately from the degenerate-lexical subset.
 
 ## 6. Report format
 

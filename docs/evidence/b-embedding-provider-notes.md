@@ -151,11 +151,15 @@ from A's completion budget:
   `embedding_usage_unknown`, `embedding_unavailable`;
 - no A ledger mutation; A's completion budget stays independent.
 
-Default B budget: `maxEmbeddingRequests=16`, `maxEmbeddingChars=60000`,
-`maxRerankRequests=0` (rerank off), `topK=100`, batch `8`,
+Default B budget: `maxEmbeddingRequests=24`, `maxEmbeddingChars=100000`,
+`maxRerankRequests=0` (rerank off), `topK=100`, `sweepCandidates=90`, batch `8`,
 `lexicalWeight=0.35`, `embeddingWeight=0.65`, `rerankWeight=0`.
-With 100 candidates and batch 8, the question plus candidates fit in about
-14 batches, so 16 requests leave margin; 60,000 chars bounds the payload.
+The candidate budget is derived: `24 * 8 - 1` (question) = 191 candidates, split
+as 100 lexical + 90 sweep + the question. The sweep quota is protected, not
+residual, because it is the only path by which a zero-overlap paraphrase can
+reach the embedder. 100,000 chars bounds the payload at roughly 500 runes per
+candidate; longer passages reduce the sweep share first and report
+`embedding_budget_limited`.
 These are conservative defaults; the user can raise/lower them, and the
 evaluation report must record the actual values. If the candidate text exceeds
 `maxEmbeddingChars`, the selector deterministically reduces the effective

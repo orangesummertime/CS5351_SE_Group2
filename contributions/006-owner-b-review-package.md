@@ -6,10 +6,11 @@
 - **Scope:** B baseline, draft FR-02/NFR-02/INV-04/INV-05, ADR-002, hybrid
   retrieval test plan, evaluation protocol, PDF extraction design, debt
   register, course test layout and AI-use disclosure.
-- **Review:** First review returned CHANGES REQUIRED on `55ec38b`; the four
-  findings and two consistency nits were addressed in the follow-up commits
-  listed below and await re-review. No implementation, evaluation run or
-  approval is claimed.
+- **Review:** Two rounds of CHANGES REQUIRED so far: the first on `55ec38b`
+  (four findings and two consistency nits) and the second on `78efdca` (the
+  sweep trigger could stay silent when lexical distractors fill the shortlist).
+  Both rounds are addressed below and in the follow-up commits; a third review is
+  pending. No implementation, evaluation run or approval is claimed.
 
 > Numbering note: this package was written as 005 while only 001 existed on
 > `main` and A's 002–004 were still unmerged. A's records have since merged, so
@@ -108,9 +109,9 @@ Limits:
   license, cloud terms, token handling and extraction quality are not yet
   reviewed.
 - Embedding/rerank provider defaults (local bge-m3/1024, weights 0.35/0.65/0,
-  top-K 100, B budget 16 requests / 60,000 chars), vector persistence and B
-  budget defaults are proposed, not approved; the local runtime/model is not
-  bundled.
+  top-K 100, sweep 90, B budget 24 requests / 100,000 chars), vector persistence
+  and B budget defaults are proposed, not approved; the local runtime/model is
+  not bundled.
 - Content revision is adopted in the design as `content_revision` +
   `content_hash`; the migration/backfill still needs C/E review, and duplicate
   migrations must be avoided at merge.
@@ -165,6 +166,36 @@ The shared `contributions/README.md`, `docs/debt-register.md` and
 requirement registry now holds A's FR-01/NFR-01/INV-01–03 and B's
 FR-02/NFR-02/INV-04–05 in a single `scope: group` file, with both sets unchanged
 entry by entry.
+
+## Second review round (on `78efdca`)
+
+The reviewer accepted the zero-request, operation-log and candidate-limit fixes
+and raised one remaining gap: the sweep was conditional, so in a long document
+with twenty or more lexical distractors neither "shortlist too small" nor "zero
+coverage" would hold, and a zero-overlap answer would still be excluded before
+embedding. B-T39 only exercised the degenerate-lexical case.
+
+- **The trigger is gone.** The sweep now runs whenever an embedder is
+  configured, with no other condition. There is no `minLexicalCandidates`
+  threshold left to satisfy.
+- **The sweep quota is protected, not residual.** The embedding candidate budget
+  is derived as `maxEmbeddingRequests * batchSize - 1` (the question), and the
+  effective shares are `min(topK, budget - sweepCandidates)` and
+  `min(sweepCandidates, budget - lexicalShare)`. Defaults are now 24 requests,
+  100,000 characters, top-K 100 and 90 sweep candidates, giving 191 candidates =
+  100 lexical + 90 sweep + question. Previously the sweep took whatever the
+  lexical stage left, which is exactly the failure mode under review.
+- **The claim is now a measured coverage, not a guarantee.** Every selection
+  reports `stride`, `sweepCoverage = S/N` and `semantic_sweep_limited` when
+  `S < N`; the requirement, the evaluation report and the user-facing copy must
+  present coverage instead of claiming that any paraphrase is recoverable.
+- **New AC-FR-02-20 / B-T40** uses 20+ query-term distractors plus a zero-overlap
+  middle answer, and covers both outcomes: gold on a sampled index (hybrid
+  selects it, lexical-only misses it) and gold off the sample (reported as a
+  coverage limitation, never `no_match` or an embedder failure).
+- The budget default change (16/60,000 → 24/100,000) is required by the
+  arithmetic; the old default could not fund a protected sweep alongside top-K
+  100.
 
 ## Presentation explanation
 

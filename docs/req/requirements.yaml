@@ -325,11 +325,28 @@ requirements:
           The lexical shortlist has zero distinct-query-term coverage and by
           itself misses the gold passage, yet the deterministic bounded semantic
           sweep places the gold segment in the embedded candidate set and the
-          hybrid result selects it. When the document is too large for the sweep
-          bound and the B embedding budget, the result reports
-          semantic_sweep_limited and the evaluation reports the miss instead of
-          claiming paraphrase recall.
+          hybrid result selects it. The sweep runs unconditionally when an
+          embedder is configured; no trigger condition may suppress it. When the
+          sample does not cover the whole document, the result reports
+          semantic_sweep_limited with sweepCoverage = S/N and the evaluation
+          reports the miss as a coverage limitation instead of claiming
+          paraphrase recall.
         test: B-T39
+      - id: AC-FR-02-20
+        scenario: >-
+          The lexical shortlist is full of query-term distractors and the
+          only correct answer is a middle passage with zero query-term overlap.
+        expected: >-
+          At least 20 lexical candidates match the query terms and the best of
+          them has nonzero coverage, so no "shortlist too small" or "zero
+          coverage" condition holds; the sweep nevertheless runs and a protected
+          sweep quota is reserved from the embedding candidate budget rather than
+          taken from what the lexical stage leaves over. When the sample lands on
+          the gold segment, hybrid selects it and lexical-only misses it. When it
+          does not, the result reports semantic_sweep_limited and sweepCoverage,
+          and the user-facing copy and evaluation report present the case as a
+          coverage limitation rather than a semantic miss or no_match.
+        test: B-T40
     tradeoff: >-
       Hybrid retrieval can use a local model, a custom endpoint or an Aliyun
       Bailian preset, so cost, latency, credentials, endpoint compatibility and
