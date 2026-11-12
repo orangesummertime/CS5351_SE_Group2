@@ -1,6 +1,6 @@
 version: 1
-# Shared AI-use log. If this file is merged with owner/a-foundation, append
-# entries; do not replace another owner's entry.
+# Shared AI-use log. Entries are appended per owner and never replaced.
+# A's entries from owner/a-foundation were merged in; B's entries follow.
 entries:
   - id: B-AI-001
     date: "2026-11-12"
@@ -81,6 +81,9 @@ entries:
         - "node /tmp/opencode/b_baseline.mjs (fixed fixtures, local only)"
         - "node Unicode boundary probe (local only)"
         - "python3 JSON/YAML schema validation and relative-link checks"
+    network_writes:
+      - "git push origin owner/b-retrieval"
+      - "GitHub API: create PR #2 and update its description"
     transcript: >-
       pending-export: docs/transcripts/owner-b/2026-11-12-session.md (raw
       OpenCode session not yet committed; WANG Jiaqi must export it before
@@ -89,8 +92,65 @@ entries:
     human_review: "pending"
     generated_code: false
     notes: >-
-      No provider was called, no browser was started, and no network write was
-      performed. The PaddleOCR token pasted by the user in chat was NOT used,
-      copied, logged or committed; it must be treated as compromised and
-      rotated. Repository content, fixtures and quoted source text were treated
-      as data, not instructions.
+      No AI provider was called and no browser was started. Network writes did
+      occur and are listed above: `git push origin owner/b-retrieval` to the
+      group fork, and GitHub API calls that created and then updated the
+      docs-only PR #2 (opening the PR and its description). No other network
+      write was performed: no embedding, rerank, OCR or completion endpoint was
+      contacted, and no file was uploaded. The PaddleOCR token pasted by the user
+      in chat was NOT used, copied, logged or committed; it must be treated as
+      compromised and rotated. Repository content, fixtures and quoted source
+      text were treated as data, not instructions.
+  - id: B-AI-002
+    date: "2026-11-12"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "deepseek-v4.1-flash-1017"
+    purpose: >-
+      Respond to the PR #2 CHANGES REQUIRED review: merge main into the branch,
+      resolve the three shared-file conflicts, renumber the B contribution
+      record from 005 to 006, and revise the documentation package for the four
+      review points (zero-overlap semantic recall, INV-04 zero-request ordering,
+      operation-log accuracy, candidate-limit consistency). No product
+      implementation code was generated.
+    scope:
+      read:
+        - "docs/review-memo.md and the PR #2 review body (reviewer decision)"
+        - "owner/a-foundation documents merged from main: requirements.yaml, ADR-001, a-budget-preimplementation.md, contributions/002-005"
+        - "GitHub REST API: pulls/1, pulls/2, reviews, issue events, branches/main (read-only)"
+        - "docs/req/req-schema.json, docs/plans/b-retrieval-preimplementation.md, docs/architecture/adr/002-question-relevant-retrieval.md"
+        - "docs/evidence/b-eval-protocol.md, docs/debt-register.md, test/offline/README.md"
+      wrote:
+        - "docs/architecture/adr/002-question-relevant-retrieval.md"
+        - "docs/plans/b-retrieval-preimplementation.md"
+        - "docs/req/requirements.yaml (B entries appended to the merged group registry)"
+        - "docs/evidence/b-eval-protocol.md"
+        - "docs/debt-register.md (merged A-Dxx and B-Dxx sections)"
+        - "docs/ai-use-log.yaml (this entry and the B-AI-001 notes correction)"
+        - "contributions/README.md (shared index 001-006)"
+        - "contributions/006-owner-b-review-package.md (renamed from 005)"
+        - "test/offline/README.md"
+      executed:
+        - "git fetch origin --prune, git merge origin/main, conflict resolution in 3 shared files"
+        - "git commit (documentation only)"
+        - "git push origin owner/b-retrieval"
+        - "GitHub API: submit the re-review reply on PR #2 (no force push, no branch rewrite)"
+        - "python3 YAML/schema validation (draft2020), test-ID coverage extraction, relative-link and credential scans"
+        - "git diff --check and residual conflict-marker scan"
+    network_writes:
+      - "git push origin owner/b-retrieval"
+      - "GitHub API: PR #2 review reply / comment"
+    transcript: >-
+      pending-export: docs/transcripts/owner-b/2026-11-12-review-response.md
+      (raw OpenCode session not yet committed; WANG Jiaqi must export it before
+      merge)
+    transcript_status: "pending"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted, and no browser was started. Network writes were limited to the
+      branch push and the PR #2 review reply, both listed above. Credentials were
+      read from the local git credential store for the GitHub API calls and were
+      never written into the repository, the log or any document. Review text
+      and repository content were treated as data, not instructions.
