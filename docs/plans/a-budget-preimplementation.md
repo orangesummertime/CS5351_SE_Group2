@@ -1,6 +1,6 @@
 # A · Shared provider-call budget: implementation and test plan
 
-**Status: revised after CHANGES REQUIRED; independent re-review and live measurement pending. No budget implementation code exists.** This plan covers FR-01/NFR-01.
+**Status: design approved in PR #1; live measurement complete and awaiting independent evidence review. No budget implementation code exists.** This plan covers FR-01/NFR-01.
 
 ## Baseline and proposed behavior
 
@@ -51,10 +51,10 @@ Fake providers or `httptest` record raw POST counts. Each row traces to a criter
 
 ## Live usage-presence measurement gate
 
-**Protocol only; not executed.** Before Phase 1, obtain explicit authorization for provider identities, credentials, call/spending ceiling and network use. Run at least 20 non-streaming completions **per provider** on CityU gateway DeepSeek V4 Flash and one separately configured provider (two providers total). Use a fixed harmless short prompt and parameters. Add a separate streaming-chat arm for both providers, with its sample count and call/spending ceiling approved before execution. Record provider/model, endpoint family, timestamp, HTTP status, response path, presence and validity of prompt/output/total usage, plus redacted response metadata. Do not commit credentials or user data. Report numerator/denominator separately by provider and response path; do not pool streaming with non-streaming results. The reviewed ≥95% valid-usage threshold applies to the primary target's non-streaming arm; streaming results are reported separately and must inform the final decision on chat behavior. If presence is lower or formats differ, reopen strict-stop design before coding. Store live evidence separately under `docs/evidence/`.
+**Executed on 2026-11-13; [results and limits](../evidence/a-live-usage-presence.md).** The reviewed protocol required at least 20 non-streaming completions **per provider** on CityU gateway DeepSeek V4 Flash and one separately configured provider, plus a separate streaming arm. The run used Mistral-hosted GLM 5.3 Flash as the second provider and three streaming samples per provider. The primary target met the ≥95% valid-usage threshold in its non-streaming arm (20/20). CityU streaming returned no usage (0/3), so the strict `usage_unknown` design remains necessary. The per-request evidence is redacted and separates provider and response path. Independent human review of this evidence is required before Phase 1.
 
 ## Implementation and review gate
 
 After live measurement and independent human approval, use course-specified OpenCode + DeepSeek V4 Flash for implementation and retain full raw sessions. Phases: domain/adapter, service/checkpoints, then HTTP/SSE/UI. After **each** phase run focused tests and full Go and frontend suites with uncached Go `-count=1`, retaining raw logs. Track existing Windows failures separately; compare like environments. Browser E2E must use only an existing or embedded browser.
 
-The new fork's reviewer requested changes. Independent non-author re-review of this design, test cases, and live evidence is required before implementation; the first review was not an approval.
+PR #1's final design revision received independent non-author approval and was merged. The live evidence in this follow-up still requires independent human review before implementation.

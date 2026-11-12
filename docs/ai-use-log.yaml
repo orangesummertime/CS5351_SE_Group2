@@ -1,0 +1,13 @@
+# Original session export is retained by the owner outside this repository.
+# The export can be supplied for course review without altering its contents.
+entries:
+  - id: AI-A-001
+    owner: Kefan CHEN
+    date: 2026-11-13
+    tool: OpenCode
+    model: CityU gateway DeepSeek V4 Flash
+    purpose: Replace a provider-specific test fixture label with a neutral example.
+    changed_file: src/web/src/features/ai/modelPicker.test.ts
+    original_session_id: ses_e2f1b5c4dffePCtP7QtFA12Wh8
+    original_export: owner-local artifacts/cs5351-a-fixture-session.json
+    verification: Focused Vitest run passed, 9 tests.

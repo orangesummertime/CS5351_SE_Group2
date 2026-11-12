@@ -1,0 +1,1067 @@
+{
+  "protocol": {
+    "prompt": "Reply with OK.",
+    "max_output_tokens": 64,
+    "max_calls": 46,
+    "stream_usage_requested": false
+  },
+  "results": [
+    {
+      "timestamp_utc": "2026-11-12T17:49:33.909146+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:35.351168+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:36.264509+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:36.744304+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:37.203685+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:37.711937+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:38.201727+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:38.864079+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:39.376982+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:39.990949+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:40.542168+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:41.043974+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:41.595368+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:42.106460+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:42.556970+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:43.015080+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:43.583051+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:44.106824+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:44.652759+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:45.392733+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "prompt_cache_hit_tokens",
+          "prompt_cache_miss_tokens",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 8,
+        "completion_tokens": 1,
+        "total_tokens": 9
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:46.508257+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 3,
+        "total_tokens": 19
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:48.097347+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 33,
+        "total_tokens": 49
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:51.110040+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 44,
+        "total_tokens": 60
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:53.872291+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:57.007851+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 29,
+        "total_tokens": 45
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:58.292233+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 35,
+        "total_tokens": 51
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:49:59.378876+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:02.623068+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:03.839628+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 43,
+        "total_tokens": 59
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:05.142927+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:07.308405+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:10.873379+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:14.741463+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:16.997444+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:18.562451+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:21.062080+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:23.880972+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:25.263743+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 58,
+        "total_tokens": 74
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:27.507027+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:30.238201+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": false,
+      "http_status": 200,
+      "response_path": "json.choices",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      }
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:33.218211+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": true,
+      "http_status": 200,
+      "response_path": "sse",
+      "usage": {
+        "present": false,
+        "valid": false,
+        "keys": []
+      },
+      "chunks": 3
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:34.829798+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": true,
+      "http_status": 200,
+      "response_path": "sse",
+      "usage": {
+        "present": false,
+        "valid": false,
+        "keys": []
+      },
+      "chunks": 2
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:35.294773+00:00",
+      "provider": "cityu",
+      "model": "CS5351/DeepSeek-V4-Flash",
+      "endpoint_family": "chat_completions",
+      "stream": true,
+      "http_status": 200,
+      "response_path": "sse",
+      "usage": {
+        "present": false,
+        "valid": false,
+        "keys": []
+      },
+      "chunks": 2
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:35.721818+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": true,
+      "http_status": 200,
+      "response_path": "sse",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      },
+      "chunks": 25
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:38.005017+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": true,
+      "http_status": 200,
+      "response_path": "sse",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      },
+      "chunks": 22
+    },
+    {
+      "timestamp_utc": "2026-11-12T17:50:38.826854+00:00",
+      "provider": "mistral",
+      "model": "mistral/zai-glm-5-3-flash",
+      "endpoint_family": "chat_completions",
+      "stream": true,
+      "http_status": 200,
+      "response_path": "sse",
+      "usage": {
+        "present": true,
+        "valid": true,
+        "keys": [
+          "completion_tokens",
+          "completion_tokens_details",
+          "prompt_tokens",
+          "prompt_tokens_details",
+          "total_tokens"
+        ],
+        "prompt_tokens": 16,
+        "completion_tokens": 64,
+        "total_tokens": 80
+      },
+      "chunks": 24
+    }
+  ]
+}
