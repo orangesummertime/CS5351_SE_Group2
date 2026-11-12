@@ -6,11 +6,13 @@
 - **Scope:** B baseline, draft FR-02/NFR-02/INV-04/INV-05, ADR-002, hybrid
   retrieval test plan, evaluation protocol, PDF extraction design, debt
   register, course test layout and AI-use disclosure.
-- **Review:** Two rounds of CHANGES REQUIRED so far: the first on `55ec38b`
-  (four findings and two consistency nits) and the second on `78efdca` (the
-  sweep trigger could stay silent when lexical distractors fill the shortlist).
-  Both rounds are addressed below and in the follow-up commits; a third review is
-  pending. No implementation, evaluation run or approval is claimed.
+- **Review:** Three rounds of CHANGES REQUIRED so far: the first on `55ec38b`
+  (four findings and two consistency nits), the second on `78efdca` (the sweep
+  trigger could stay silent when lexical distractors fill the shortlist), and the
+  third on `66fc582` (the share arithmetic could go negative or overflow, and
+  character pressure could starve the protected sweep). All three are addressed
+  below and in the follow-up commits; a fourth review is pending. No
+  implementation, evaluation run or approval is claimed.
 
 > Numbering note: this package was written as 005 while only 001 existed on
 > `main` and A's 002–004 were still unmerged. A's records have since merged, so
@@ -196,6 +198,55 @@ embedding. B-T39 only exercised the degenerate-lexical case.
 - The budget default change (16/60,000 → 24/100,000) is required by the
   arithmetic; the old default could not fund a protected sweep alongside top-K
   100.
+
+## Third review round (on `66fc582`)
+
+The reviewer accepted the unconditional sweep and B-T40 and found two arithmetic
+defects in the share rule:
+
+1. **Negative or overflowing shares.** With `maxEmbeddingRequests=1`,
+   `batchSize=8` and `sweepCandidates=90`, the budget is 7 and
+   `min(topK, 7 - 90)` is `-83`; the next formula then assigned 90 sweep
+   candidates to 7 slots. A character clamp could produce the same shape.
+2. **Character pressure starving the sweep.** The plan reduced sweep candidates
+   before lexical ones on character overflow, which could take the "protected"
+   sweep to zero while lexical distractors remained — restoring the failure the
+   previous revision fixed.
+
+Both are now fixed by replacing the subtraction with a proportional split of
+**two** budgets:
+
+```text
+embeddingSlotBudget = max(0, maxEmbeddingRequests * batchSize - 1)
+embeddingCharBudget = max(0, maxEmbeddingChars - questionChars)
+sweepRatio          = sweepCandidates / (topK + sweepCandidates)
+sweepSlots          = floor(embeddingSlotBudget * sweepRatio)
+lexicalSlots        = embeddingSlotBudget - sweepSlots
+sweepChars          = floor(embeddingCharBudget * sweepRatio)
+lexicalChars        = embeddingCharBudget - sweepChars
+```
+
+Every share is nonnegative and the two shares sum exactly to their budget for
+every configuration. The reviewer's example now yields 3 sweep / 4 lexical out of
+7. Because each side stops at its own character allowance, character pressure
+shrinks both sides proportionally instead of consuming the sweep, so lexical
+distractors can never starve it. When the sweep share cannot hold one passage the
+result reports `semantic_sweep_limited` with reason `sweep_zero_slots` and
+`sweepCoverage = 0`; a deliberate `sweepCandidates=0` is a separate
+`sweep_disabled_by_config` reason and makes no zero-overlap claim.
+
+Tests: B-T33 gains a low-budget matrix (`maxEmbeddingRequests=1` → 3/4 out of 7,
+nonnegative, sums exact, one request observed; `maxEmbeddingRequests=0` →
+`lexical_only` with `embedding_budget_exhausted`; `sweepCandidates=0` →
+`sweep_disabled_by_config`; one-passage-tall `maxEmbeddingChars` →
+`sweep_zero_slots`), and B-T40 gains Variant C where the character budget binds
+before the slots and the sweep must still receive at least one passage while the
+lexical share shrinks. The evaluation protocol requires both a budget-starved and
+a character-bound run, reported outside the 120k recall denominator.
+
+The example configurations were also evaluated numerically before the commit: for
+`requests=1`, `requests=0`, `sweepCandidates=0` and a tight character budget, the
+shares stayed nonnegative and summed to the derived budget in every case.
 
 ## Presentation explanation
 

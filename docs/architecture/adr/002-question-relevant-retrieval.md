@@ -78,12 +78,14 @@ Use **server-side hybrid retrieval** at **sentence/segment granularity**:
    candidate budget is non-zero.
    The selector unions the lexical shortlist with a **deterministic,
    position-stratified sample of the whole document**: every ⌈N/S⌉-th
-   sentence/segment in source order, where S is the effective sweep quota. S is
-   `min(sweepCandidates, embeddingCandidateBudget - effectiveLexicalCandidates)`,
-   so the sweep always receives a protected share of the candidate budget rather
-   than whatever the lexical stage leaves over. Every selection reports
-   `sweepCoverage = S / N`, and when `S < N` the status reports
-   `semantic_sweep_limited`. The zero-overlap recall claim is therefore bounded
+   sentence/segment in source order, where S is the effective sweep quota. The
+   quota comes from a proportional split of both the request-slot and character
+   budgets (see "Semantic sweep share" below), so it is always nonnegative, never
+   exceeds the derived budget, and is reserved before lexical candidates rather
+   than taken from what the lexical stage leaves over. Every selection reports
+   `sweepCoverage = S / N`; when `S < N` the status reports
+   `semantic_sweep_limited`, and when the sweep share cannot hold one passage it
+   reports `sweep_zero_slots` with `sweepCoverage = 0`. The zero-overlap recall claim is therefore bounded
    by that coverage and is never stated as a guarantee: the requirement, the
    evaluation report and the user-facing copy must present `sweepCoverage`
    instead of claiming that any paraphrase is recoverable. With no embedder
@@ -144,26 +146,50 @@ score is per content row, not per passage. See
 
 ## Hybrid scoring and model pinning
 
-- **Candidate limit:** the lexical shortlist size is `topK` (default 100,
-  accepted range 20–1,000). The embedding candidate budget is derived, not a
-  separate guess: `embeddingCandidateBudget = maxEmbeddingRequests * batchSize -
-  1` (one slot for the question), further clamped by `maxEmbeddingChars` and by
-  the actual passage lengths. This is the number that bounds both the lexical
-  share and the sweep share.
-- **Semantic sweep share:** `sweepCandidates` is the requested sweep quota
-  (default 90, accepted range 0–1,000). The effective lexical share is
-  `min(topK, embeddingCandidateBudget - sweepCandidates)` and the effective sweep
-  is `min(sweepCandidates, embeddingCandidateBudget - effectiveLexicalShare)`.
-  With the defaults (`maxEmbeddingRequests=24`, `batchSize=8`,
-  `maxEmbeddingChars=100000`) the budget is 191 candidates: 100 lexical + 90
-  sweep + 1 question = 191, which is the whole budget with no slack, so a
-  document longer than the sweep sample reports `semantic_sweep_limited`. The
-  sweep is a deterministic position-stratified sample, not a random one, so a
-  frozen-vector replay stays byte-identical.
+- **Candidate budget (request slots):** `embeddingSlotBudget = max(0,
+  maxEmbeddingRequests * batchSize - 1)`, where the subtracted slot is the
+  question. A request-slot budget of 0 means no embedding happens at all.
+- **Candidate budget (characters):** `embeddingCharBudget = max(0,
+  maxEmbeddingChars - questionChars)`. This is a real second limit: 191 is a
+  request-slot ceiling, and passage lengths can bind first at
+  `maxEmbeddingChars=100000`.
+- **Proportional, nonnegative shares.** The sweep share is a **ratio**, not a
+  subtraction, because subtracting can go negative or exceed the budget:
+  `sweepRatio = sweepCandidates / (topK + sweepCandidates)`, `0` when the
+  denominator is 0. Then
+  `sweepSlots = floor(embeddingSlotBudget * sweepRatio)` and
+  `lexicalSlots = embeddingSlotBudget - sweepSlots`; likewise
+  `sweepChars = floor(embeddingCharBudget * sweepRatio)` and
+  `lexicalChars = embeddingCharBudget - sweepChars`. Every share is therefore
+  `>= 0`, `sweepSlots + lexicalSlots == embeddingSlotBudget`, and
+  `sweepChars + lexicalChars == embeddingCharBudget`. `topK` caps
+  `lexicalSlots` from above only; it never pushes the sum over the budget.
+  This holds for every configuration, including `maxEmbeddingRequests=1`, where
+  the budget is 7 slots and the shares are 3 sweep / 4 lexical rather than a
+  negative lexical share and an over-budget sweep.
+- **Both limits protect the sweep.** Each side selects up to its own slot count
+  and stops when its own character allowance is used. Character pressure
+  therefore shrinks both sides proportionally instead of consuming the sweep
+  first; lexical distractors can never take the sweep's reserved slots.
+- **Explicit zero-coverage outcome.** If `sweepCandidates=0`, or the computed
+  `sweepSlots` or `sweepChars` cannot hold at least one passage, then `S=0` and
+  `sweepCoverage=0`. The result must carry `semantic_sweep_limited` with the
+  `sweep_zero_slots` reason and must not claim zero-overlap recall at all. A
+  configured `sweepCandidates=0` is a deliberate opt-out and is labelled as such,
+  not silently merged into the same status as a budget-starved run.
+- **With the defaults** (`maxEmbeddingRequests=24`, `batchSize=8`, `topK=100`,
+  `sweepCandidates=90`, `maxEmbeddingChars=100000`): slot budget 191,
+  `sweepRatio = 90/190`, `sweepSlots = 90`, `lexicalSlots = 101` capped to 100, so
+  190 of 191 slots are used and one slot is spare; the character split is about
+  47,300 sweep and 52,600 lexical, which holds 90 passages of roughly 500 runes.
+  A document longer than 90 sampled segments reports `semantic_sweep_limited`.
+- The sweep is a deterministic position-stratified sample, not a random one, so
+  a frozen-vector replay stays byte-identical.
 - **What the claim is:** recall for a zero-overlap paraphrase is bounded by
   `sweepCoverage = S/N`. The design guarantees a bounded, deterministic path
   into the candidate set and reports how much of the document that path covered;
-  it does not guarantee that any given zero-overlap passage is sampled.
+  it does not guarantee that any given zero-overlap passage is sampled, and it
+  reports `sweepCoverage=0` rather than implying support when the shares collapse.
 - **Score:** `hybrid = lexicalWeight * lexical_norm + embeddingWeight * cosine
   + rerankWeight * rerank_norm`. Weights are user-configurable, each in `[0,1]`;
   at least one is positive; they are normalized to sum 1. Defaults: 0.35/0.65/0

@@ -70,6 +70,9 @@ WANG Jiaqi prepares and confirms:
 - at least one document large enough that the deterministic semantic sweep is
   clamped by the candidate budget; the run must report `semantic_sweep_limited`
   and record the sampled index set and its size;
+- at least one character-bound fixture where `maxEmbeddingChars` binds before the
+  request slots; the sweep must still receive at least one passage of capacity,
+  and the report must show which share shrank;
 - no real user data, credentials, cookies or private URLs; use existing fixtures
   or manually constructed text.
 
@@ -183,17 +186,24 @@ Determinism rules:
 - Record `providerKind` (local/custom/Bailian), endpoint family (not the key),
   `embeddingModel`, `dimensions`, `batchSize`, `textType`, `instruct`,
   `modelHash`, `vectorHash`, `topK` (default 100), `sweepCandidates`
-  (default 90), the derived `embeddingCandidateBudget` and the effective lexical
-  and sweep shares, `hybridWeights`, rerank model/`topN`/weight
+  (default 90), `sweepRatio`, the derived `embeddingSlotBudget` and
+  `embeddingCharBudget` and the effective lexical and sweep shares, `hybridWeights`, rerank model/`topN`/weight
   (if enabled) and the B budget limits in the report.
 - If a PDF subset uses PaddleOCR, record the extractor version and OCR job
   configuration; do not pool OCR and native text pages without labeling them.
-- Record `sweepCandidates`, the derived `embeddingCandidateBudget`, the effective
-  lexical share and sweep share, the sampled index set, `stride`,
-  `sweepCoverage` and whether `semantic_sweep_limited` was reported. A run with
-  `sweepCoverage < 1` must not be presented as an unbounded paraphrase-recall
-  claim: report the zero-overlap recall **at that coverage**, and report the
-  distractor-saturated subset separately from the degenerate-lexical subset.
+- Record `sweepCandidates`, `sweepRatio`, the derived `embeddingSlotBudget` and
+  `embeddingCharBudget`, the resulting `sweepSlots`/`lexicalSlots` and
+  `sweepChars`/`lexicalChars`, the sampled index set, `stride`, `sweepCoverage`,
+  and any zero-coverage reason (`sweep_zero_slots`,
+  `sweep_disabled_by_config`). A run with `sweepCoverage < 1` must not be
+  presented as an unbounded paraphrase-recall claim: report the zero-overlap
+  recall **at that coverage**, and report the distractor-saturated subset
+  separately from the degenerate-lexical subset.
+- Run at least one **budget-starved configuration** (for example
+  `maxEmbeddingRequests=1`) and one **character-bound configuration**, and report
+  the resulting shares. These runs exist to prove the shares stay nonnegative and
+  within budget, and that character pressure does not silently take the sweep's
+  allowance; they are not part of the 120k recall denominator.
 
 ## 6. Report format
 

@@ -154,12 +154,17 @@ from A's completion budget:
 Default B budget: `maxEmbeddingRequests=24`, `maxEmbeddingChars=100000`,
 `maxRerankRequests=0` (rerank off), `topK=100`, `sweepCandidates=90`, batch `8`,
 `lexicalWeight=0.35`, `embeddingWeight=0.65`, `rerankWeight=0`.
-The candidate budget is derived: `24 * 8 - 1` (question) = 191 candidates, split
-as 100 lexical + 90 sweep + the question. The sweep quota is protected, not
-residual, because it is the only path by which a zero-overlap paraphrase can
-reach the embedder. 100,000 chars bounds the payload at roughly 500 runes per
-candidate; longer passages reduce the sweep share first and report
-`embedding_budget_limited`.
+The candidate budget is derived on two axes: `24 * 8 - 1` (question) = **191
+request slots**, and `maxEmbeddingChars` minus the question as the character
+budget. Both are split by the same ratio `sweepCandidates / (topK +
+sweepCandidates)` = 90/190, so the shares are `sweepSlots = floor(191 * 90/190) =
+90` and `lexicalSlots = 101` (capped by `topK=100`), and the character budget
+splits about 47,300 sweep / 52,600 lexical. Shares are nonnegative and always sum
+to the derived budget, so a small configuration such as
+`maxEmbeddingRequests=1` yields 3 sweep / 4 lexical out of 7 rather than a
+negative share. Character pressure shrinks both shares proportionally; it never
+takes the sweep's allowance, and if the sweep share cannot hold one passage the
+result reports `semantic_sweep_limited` with reason `sweep_zero_slots`.
 These are conservative defaults; the user can raise/lower them, and the
 evaluation report must record the actual values. If the candidate text exceeds
 `maxEmbeddingChars`, the selector deterministically reduces the effective

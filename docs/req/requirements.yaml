@@ -339,11 +339,15 @@ requirements:
         expected: >-
           At least 20 lexical candidates match the query terms and the best of
           them has nonzero coverage, so no "shortlist too small" or "zero
-          coverage" condition holds; the sweep nevertheless runs and a protected
-          sweep quota is reserved from the embedding candidate budget rather than
-          taken from what the lexical stage leaves over. When the sample lands on
-          the gold segment, hybrid selects it and lexical-only misses it. When it
-          does not, the result reports semantic_sweep_limited and sweepCoverage,
+          coverage" condition holds; the sweep nevertheless runs. Its share is
+          proportional and reserved from both the request-slot and character
+          budgets, never taken from what the lexical stage leaves over, and it is
+          always nonnegative with the two shares summing to the derived budget.
+          Character pressure shrinks both shares proportionally instead of
+          consuming the sweep. When the sample lands on the gold segment, hybrid
+          selects it and lexical-only misses it. When it does not, or when the
+          computed sweep share cannot hold one passage, the result reports
+          semantic_sweep_limited with sweepCoverage and a zero-coverage reason,
           and the user-facing copy and evaluation report present the case as a
           coverage limitation rather than a semantic miss or no_match.
         test: B-T40
