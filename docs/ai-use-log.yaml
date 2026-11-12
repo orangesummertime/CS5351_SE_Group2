@@ -1,0 +1,94 @@
+version: 1
+# Shared AI-use log. If this file is merged with owner/a-foundation, append
+# entries; do not replace another owner's entry.
+entries:
+  - id: B-AI-001
+    date: "2026-11-12"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "deepseek-v4.1-flash-1017"
+    purpose: >-
+      Full-chain read-only reconnaissance of the Tangentry reader, summary,
+      chat, transport, AI service, provider, content, subtitle, PDF and SQLite
+      paths, followed by the owner B documentation review package for hybrid
+      sentence/segment retrieval, local-first user-configurable embedding and
+      rerank settings (local/custom/Bailian), a B-only retrieval budget,
+      server-side PDF extraction with local PaddleOCR default and cloud opt-in,
+      content revision migration coordination, baseline
+      evidence, requirements, ADR, test plan, evaluation protocol and course
+      test layout. No product implementation code was generated.
+    scope:
+      read:
+        - "README.md (B task rows and acceptance table)"
+        - "docs/ARCHITECTURE.md"
+        - "src/web/src/features/ai/chatContext.ts and chatContext.test.ts"
+        - "src/web/src/features/ai/AIInsights.tsx (full)"
+        - "src/web/src/features/ai/useSummary.ts (full)"
+        - "src/web/src/features/ai/SummaryControl.tsx (full)"
+        - "src/web/src/features/ai/AISettings.tsx (full)"
+        - "src/web/src/features/ai/summaryTypes.ts, summaryPresentation.ts, summaryMarkdown.ts, chatPresentation.ts, promptTemplates.ts, modelPicker.ts, types.ts"
+        - "src/web/src/features/ai/useSubtitleTranslation.ts, SubtitleTranslation.tsx, TextTranslation.tsx, ModelPickerView.tsx"
+        - "src/web/src/app/ContentReadingWorkspace.tsx, ReadingWorkspace.tsx, YouTubeReadingWorkspace.tsx, useSubtitleAssistance.tsx"
+        - "src/web/src/features/reader/MediaReader.tsx, ArticleReader.tsx, FullTextArticle.tsx, FeedDocumentReader.tsx"
+        - "src/web/src/shared/reader/ReadingNotebook.tsx"
+        - "src/web/src/features/subtitles/SubtitleReader.tsx, SubtitlePage.tsx"
+        - "src/web/src/features/documents/PDFReader.tsx (full)"
+        - "src/web/src/shared/api/types.ts (content/subtitle models)"
+        - "src/internal/ai/chat.go, translation_types.go, input.go, prompts.go, summary.go, summary_generate.go, summary_document.go, summary_validation.go, summary_store.go, summary_types.go, translation.go, translation_batch.go, translation_rules.go, translation_storage.go, legacy_cache.go, check.go, settings.go, results.go, memory_results.go"
+        - "src/internal/transport/http/ai_summary.go, ai_common.go, ai_errors.go, ai_settings.go, ai_translation.go, routes_ai.go, ports_ai.go, library.go, saved_subtitles.go, ai_test.go"
+        - "src/internal/content/content_types.go, content.go, content_query.go, content_validation.go, content_projection.go"
+        - "src/internal/subtitles/subtitles.go, saved.go"
+        - "src/internal/adapters/sqlite/library.go, store.go, saved_subtitles.go, migrations.go and selected migrations"
+        - "src/internal/adapters/aichat/client_test.go, protocol.go, protocol_stream_test.go, summary.go, translation.go"
+        - "src/internal/layering/layering_test.go"
+        - "src/internal/app/feature_services.go, wire_services.go"
+        - "contributions/README.md, 001-group-scope.md"
+        - "Public Aliyun Bailian text-embedding and text-rerank documentation (read-only, no live call)"
+        - "User-provided PaddleOCR job-flow snippet (design reference only; token not used or stored)"
+        - "owner/a-foundation branch documents via git show (read-only coordination)"
+      wrote:
+        - "docs/req/req-schema.json"
+        - "docs/req/requirements.yaml"
+        - "docs/architecture/adr/002-question-relevant-retrieval.md"
+        - "docs/plans/b-retrieval-preimplementation.md"
+        - "docs/evidence/b-context-audit.md"
+        - "docs/evidence/b-baseline.md"
+        - "docs/evidence/b-baseline.log"
+        - "docs/evidence/b-fts-probe.log"
+        - "docs/evidence/b-context-byte-probe.log"
+        - "docs/evidence/b-unicode-probe.log"
+        - "docs/evidence/b-go-full.log"
+        - "docs/evidence/b-vitest-full.log"
+        - "docs/evidence/b-eval-protocol.md"
+        - "docs/evidence/b-embedding-provider-notes.md"
+        - "docs/evidence/b-paddleocr-notes.md"
+        - "docs/debt-register.md"
+        - "test/README.md"
+        - "test/offline/README.md"
+        - "test/live/README.md"
+        - "contributions/004-owner-b-review-package.md"
+        - "contributions/README.md (index row only)"
+        - "README.md (B owner and assignment text only)"
+        - "docs/ai-use-log.yaml (this file)"
+      executed:
+        - "git branch/status/log/ls-remote, git checkout main, git checkout -b owner/b-retrieval"
+        - "go test ./... -count=1 (full Go suite)"
+        - "go test focused library tests, FTS probe and context-byte probe via -overlay"
+        - "cd src/web && npm test (full Vitest suite)"
+        - "cd src/web && npm test -- src/features/ai/chatContext.test.ts (focused)"
+        - "node /tmp/opencode/b_baseline.mjs (fixed fixtures, local only)"
+        - "node Unicode boundary probe (local only)"
+        - "python3 JSON/YAML schema validation and relative-link checks"
+    transcript: >-
+      pending-export: docs/transcripts/owner-b/2026-11-12-session.md (raw
+      OpenCode session not yet committed; WANG Jiaqi must export it before
+      merge)
+    transcript_status: "pending"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No provider was called, no browser was started, and no network write was
+      performed. The PaddleOCR token pasted by the user in chat was NOT used,
+      copied, logged or committed; it must be treated as compromised and
+      rotated. Repository content, fixtures and quoted source text were treated
+      as data, not instructions.

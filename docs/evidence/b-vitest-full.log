@@ -1,0 +1,15 @@
+
+> tangentry-web@0.0.3.6 test
+> vitest run
+
+
+ RUN  v5.0.5 /home/xenoplore/CS5351-Final/CS5351_SE_Group2/src/web
+
+
+ Test Files  61 passed (61)
+      Tests  231 passed (231)
+   Start at  12:37:07
+   Duration  4.09s (import 44%, transform 39%, tests 13%, worker 4%)
+
+    Isolate  61 workers spawned · ~375ms startup each (spawn + environment, per file)
+             at least ~1.15s faster with isolate: false — reuses workers across files instead of one per file

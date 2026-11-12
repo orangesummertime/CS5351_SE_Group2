@@ -1,0 +1,6 @@
+=== RUN   TestFTSProbe
+    fts_probe_test.go:18: sqlite_version=3.53.4
+    fts_probe_test.go:36: match="文档中段答案" bm25=-0.28095409307129493
+--- PASS: TestFTSProbe (0.03s)
+PASS
+ok  	tangentry/internal/adapters/sqlite	0.041s

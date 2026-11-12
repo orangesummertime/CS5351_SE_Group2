@@ -1,0 +1,6 @@
+=== RUN   TestContextByteLimitProbe
+    context_probe_test.go:11: cjk_chars=120000 cjk_bytes=360000 valid=false
+    context_probe_test.go:12: ascii_chars=120000 ascii_bytes=120000 valid=true
+--- PASS: TestContextByteLimitProbe (0.00s)
+PASS
+ok  	tangentry/internal/ai	0.005s

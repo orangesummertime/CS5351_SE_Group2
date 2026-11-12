@@ -5,5 +5,8 @@ Records start with this fork's first group commit. Each entry states the actual 
 | No. | Commit | Owner | Scope |
 | --- | --- | --- | --- |
 | [001](001-group-scope.md) | `docs: restore group scope and contribution log` | Kefan CHEN | Project scope, five-part task list, contribution format |
+| [004](004-owner-b-review-package.md) | `docs: prepare owner B retrieval review package` | WANG Jiaqi | B baseline, hybrid retrieval with configurable embedding/rerank and budget, PDF/PaddleOCR design, test plan, evaluation protocol, course test layout, and AI-use disclosure |
 
 The upstream history predates this group record and is not reconstructed here.
+Numbers 002–003 are reserved by the unmerged `owner/a-foundation` branch; this
+branch uses 004 so the eventual merge stays append-only.
