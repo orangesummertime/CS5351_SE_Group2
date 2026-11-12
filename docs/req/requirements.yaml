@@ -316,6 +316,20 @@ requirements:
           cloud OCR. Local runtime/model missing returns embedding_unavailable
           or pdf_ocr_unavailable, never a silent upload.
         test: B-T37
+      - id: AC-FR-02-19
+        scenario: >-
+          A long document contains the answer in a middle passage that shares no
+          query term with the question (a paraphrase, including one
+          cross-language pair).
+        expected: >-
+          The lexical shortlist has zero distinct-query-term coverage and by
+          itself misses the gold passage, yet the deterministic bounded semantic
+          sweep places the gold segment in the embedded candidate set and the
+          hybrid result selects it. When the document is too large for the sweep
+          bound and the B embedding budget, the result reports
+          semantic_sweep_limited and the evaluation reports the miss instead of
+          claiming paraphrase recall.
+        test: B-T39
     tradeoff: >-
       Hybrid retrieval can use a local model, a custom endpoint or an Aliyun
       Bailian preset, so cost, latency, credentials, endpoint compatibility and

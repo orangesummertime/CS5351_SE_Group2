@@ -18,12 +18,17 @@ cases. All four 120k outputs also exceed the backend's 200,000-byte cap
 The proposed retrieval mode is **server-side hybrid**:
 
 1. deterministic lexical candidates over sentence/segment units;
-2. embedding rerank of the top-K candidates with a pinned or approved model;
-3. fixed hybrid weights, stable tie-breaks and budgeted assembly;
-4. explicit `lexical_only`, `no_match`, `pdf_ocr_unavailable`, `pdf_no_text`,
+2. a bounded, deterministic **semantic sweep** that adds position-stratified
+   passages to the candidate set when the lexical shortlist is too small or
+   shares no query term, so a paraphrase/cross-language question can still reach
+   the embedder;
+3. embedding rerank of the unioned candidates with a pinned or approved model;
+4. fixed hybrid weights, stable tie-breaks and budgeted assembly;
+5. explicit `lexical_only`, `no_match`, `semantic_sweep_limited`,
+   `pdf_ocr_unavailable`, `pdf_no_text`,
    `pdf_extracting`, `source_unverified`, `stale_source` and
    `context_budget_exceeded` states;
-5. server-side PDF page text extraction and storage, so PDF chat has the same
+6. server-side PDF page text extraction and storage, so PDF chat has the same
    source-verification contract as articles and subtitles.
 
 Retrieval off preserves the existing frontend path and wire shape.
@@ -117,6 +122,7 @@ const (
     SelectionPDFExtractFail  SelectionStatus = "pdf_extract_failed"
     SelectionPDFOCRUnavailable SelectionStatus = "pdf_ocr_unavailable"
     SelectionSourceInvalid   SelectionStatus = "source_unverified"
+    SelectionSweepLimited    SelectionStatus = "semantic_sweep_limited"
 )
 
 type Selection struct {
@@ -125,10 +131,24 @@ type Selection struct {
     Mode     string    // hybrid or lexical_only
     Dropped  int
     EmbeddingModel string
+    // Sweep records the bounded semantic sweep for replay and reporting.
+    Sweep struct {
+        Used         bool
+        Sampled      int // candidates added by the sweep
+        Stride       int // ceil(N/S); 1 means every segment was sampled
+        Limited      bool // true when the B budget could not cover the document
+    }
+    LexicalCandidates int // distinct-query-term coverage diagnostics
 }
 
 type PassageSelector interface {
     Select(ctx context.Context, contentID, question string, maxCandidates int) (Selection, error)
+}
+
+type SweepConfig struct {
+    Enabled             bool // false when no embedder is configured
+    MinLexicalCandidates int // default 20
+    MaxSweepCandidates   int // default 200, clamped by the B embedding budget
 }
 
 type HistoryTurn struct {
@@ -168,7 +188,9 @@ its `ChatMessage` to `HistoryTurn`.
 
 - **Backend:** load the source by `contentId`; ignore the client-supplied
   `context` in retrieval mode; split into sentence/segments; generate lexical
-  candidates; call the embedder for top-K when enabled; verify every selected
+  candidates; when the lexical shortlist is small or has zero query-term
+  overlap, add the bounded position-stratified semantic sweep and call the
+  embedder for the union; verify every selected
   range; assemble the six layers; call the chat provider only after INV-04/INV-05
   pass; return passage references and an explicit status.
 - **Frontend:** send `contentId`, the current question and a `retrieval` object
@@ -275,6 +297,12 @@ dimension choices; the provider notes record the limits.
 Default B budget: `maxEmbeddingRequests=16`, `maxEmbeddingChars=60000`,
 `maxRerankRequests=0` (rerank off), top-K 100, batch 8. With 100 candidates and
 batch 8, the question plus candidates fit in about 14 batches; 16 leaves margin.
+The semantic sweep is clamped by the same budget: `maxSweepCandidates` defaults
+to 200 but the selector first spends the remaining `maxEmbeddingChars`/batches,
+so a sweep over a very long document samples fewer passages and reports
+`semantic_sweep_limited`. The sweep is deterministic (every ⌈N/S⌉-th
+sentence/segment in source order), never random, so a frozen-vector replay is
+byte-identical.
 If candidate text exceeds the char cap, the selector deterministically reduces
 the effective candidate count and reports `embedding_budget_limited`. Defaults
 may be raised/lowered by the user; the evaluation records the actual values.
@@ -473,7 +501,7 @@ Assertions use exact counts/bytes/IDs rather than only a final status.
 | B-T22 | INV-04 | History overflow: oldest whole turns dropped first, current user turn retained, constraint reminder re-injected before the task, final rune/byte counts within bounds. |
 | B-T23 | AC-FR-02-4, AC-NFR-02-1 | Summary material competes for the budget: the assembler never falls back to head/tail text, no-match remains explicit, and the summary layer never exceeds its cap. |
 | B-T24 | INV-04, B budget | Fake provider records every POST: lexical candidate generation makes zero completion POSTs; remote embedding/rerank calls are counted by B's own retrieval budget before start; A's ledger is never read or mutated; exceeding B's budget stops further provider calls and falls back with an explicit status. |
-| B-T25 | INV-04, INV-05 | HTTP/SSE mapping for `invalid_budget`, `no_match`, `lexical_only`, `pdf_ocr_unavailable`, `pdf_no_text`, `pdf_extracting`, `pdf_extract_failed`, `source_unverified`, `stale_source`, `context_budget_exceeded`: distinct status/copy, no generic provider error, no `event: done` on rejected assembly. |
+| B-T25 | INV-04, INV-05 | HTTP/SSE mapping for `invalid_budget`, `no_match`, `lexical_only`, `semantic_sweep_limited`, `pdf_ocr_unavailable`, `pdf_no_text`, `pdf_extracting`, `pdf_extract_failed`, `source_unverified`, `stale_source`, `context_budget_exceeded`: distinct status/copy, no generic provider error, no `event: done` on rejected assembly. `semantic_sweep_limited` must not be rendered as `no_match` and must not suppress a valid selected passage. |
 | B-T26 | AC-FR-02-12, AC-NFR-02-5 | Embedder unavailable, timeout, wrong dimension, invalid vector, or model identity mismatch: hybrid degrades to `lexical_only` with explicit status; no mixed vectors; INV-04/INV-05 still hold; report counts the degradation. |
 | B-T27 | AC-FR-02-10 | PDF variants: no text layer, local OCR missing, encrypted/corrupt file, extractor timeout, page-count mismatch: explicit `pdf_ocr_unavailable`/`pdf_no_text`/`pdf_extract_failed`; no fabricated page or sentence; zero chat POST when assembly fails. |
 | B-T28 | AC-FR-02-10 | PDF document hash changes: old page rows and old passage IDs are invalid; new extraction uses the new hash; old citations are `stale_source`. |
@@ -487,12 +515,14 @@ Assertions use exact counts/bytes/IDs rather than only a final status.
 | B-T36 | AC-FR-02-17 | Optional rerank: off -> zero rerank POST; Bailian/custom -> `relevance_score` combined with weights; rerank failure -> `rerank_unavailable` and fallback; rerank requests counted by B budget; scores are not compared across requests. |
 | B-T37 | AC-FR-02-18 | Local-first defaults: default embedding provider is local (recommended bge-m3/1024) and default OCR provider is local; no cloud embedding/OCR POST and no token access; an explicit provider switch is required before any cloud call; local runtime missing -> `embedding_unavailable`/`pdf_ocr_unavailable`, not silent upload. |
 | B-T38 | AC-INV-05-4 | Content revision migration: old DB upgrades with `content_revision=1` and a computed `content_hash`; a successful save increments revision and replaces hash; repeated migration is idempotent; C/E read the new fields; no duplicate column migration is added by C/E. |
+| B-T39 | AC-FR-02-19 | Zero-overlap paraphrase: a fixed 156,000-character article whose gold middle passage shares **no** query term with the question (paraphrase, and one cross-language pair): the lexical shortlist has zero distinct-query-term coverage, the deterministic sweep candidate set contains the gold segment, hybrid selects it, and lexical-only misses it. A second fixture whose document exceeds the sweep/budget cap asserts `semantic_sweep_limited` and that the limitation is reported instead of a paraphrase claim. Assert exact sweep indices, request count and the unchanged drop order. |
 
 ## Negative-test coverage
 
 | Risk | Test(s) | What must not happen |
 | --- | --- | --- |
 | No relevant passage | B-T05, B-T23 | Silent head/tail fallback or an empty context presented as success |
+| Zero query-term overlap (paraphrase) | B-T39 | Reporting a paraphrase miss as a semantic failure while the passage was never a candidate; unbounded sweep cost |
 | Malicious passage/query text | B-T07 | Instruction execution, secret exposure, tool invocation, or embedding text treated as an instruction |
 | Oversized sentence/segment | B-T08, B-T21 | A partial passage with a forged/partial locator |
 | Duplicate sentences/cues | B-T06 | Double-counted evidence or non-deterministic ranking |
@@ -517,7 +547,7 @@ Assertions use exact counts/bytes/IDs rather than only a final status.
 1. **Domain core:** sentence/segment splitter, lexical candidate scorer, hybrid
    score, dedupe, budget assembler, INV-04/INV-05 validators. Fake embedder with
    fixed vectors. Tests: B-T02, B-T06, B-T08, B-T10, B-T14, B-T15, B-T16, B-T21,
-   B-T22, B-T29.
+   B-T22, B-T29, B-T39.
 2. **Source and content version:** normalized snapshot for article/discussion,
    saved subtitles, content revision/hash migration 084 with legacy backfill;
    source-version propagation. Tests: B-T03, B-T19, B-T28, B-T38, with
@@ -584,6 +614,11 @@ them:
    any deviation.
 3. **Rerank:** off by default; Bailian/custom is optional; top-N, instruct,
    weight and budget are user-configurable; scores are request-relative.
+3b. **Semantic sweep bounds:** confirm `minLexicalCandidates=20` and
+   `maxSweepCandidates=200` with the reviewer, and confirm that
+   `semantic_sweep_limited` is the accepted status when the B embedding budget
+   cannot cover the whole document. This is the bound behind the paraphrase
+   claim.
 4. **Vector persistence:** SQLite `passage_embeddings` cache versus process-local
    cache; migration 083 if persistent.
 5. **PDF/OCR default confirmed local.** Confirm the local PaddleOCR runtime

@@ -67,7 +67,22 @@ Use **server-side hybrid retrieval** at **sentence/segment granularity**:
 1. **Lexical candidate generation** runs locally over the normalized source.
    It is deterministic, fast and makes no provider call. It returns the top-K
    candidate sentences/segments.
-2. **Embedding rerank** embeds the question and the top-K candidates with a
+1b. **Bounded semantic sweep.** A lexical shortlist cannot contain a passage
+   that shares no query term with the question, so a paraphrase or a
+   cross-language question would never reach the embedding stage. When an
+   embedder is configured, the selector therefore unions the lexical shortlist
+   with a **deterministic, budget-bounded sample of the whole document**: every
+   ⌈N/S⌉-th sentence/segment over source order, where S is bounded by
+   `maxSweepCandidates` (default 200) and by the remaining
+   `maxEmbeddingChars`/`maxEmbeddingRequests`. The sweep runs whenever the
+   lexical stage yields fewer than `minLexicalCandidates` (default 20) or the
+   best lexical candidate has zero distinct query-term coverage. When the sweep
+   cannot cover the whole document inside the B budget, the sample stays
+   position-stratified, the status reports `semantic_sweep_limited`, and the
+   evaluation reports that limitation instead of claiming unlimited paraphrase
+   recall. With no embedder configured the path stays `lexical_only` and no
+   paraphrase claim is made.
+2. **Embedding rerank** embeds the question and the unioned candidate set with a
    user-selected embedder, then scores cosine similarity. The user can choose a
    local OpenAI-compatible server, a custom remote endpoint/key/model, or an
    Aliyun Bailian preset; dimensions, batch size, `text_type`, `instruct`,
@@ -102,7 +117,7 @@ must not be the authority for retrieval, embeddings or locators.
 | Existing content-level FTS5 + BM25 ([063_unified_search.sql:10-18](../../../src/internal/adapters/sqlite/migrations/063_unified_search.sql#L10-L18)) | Can identify that a content item contains terms, but the index stores one concatenated row per content ID ([063_unified_search.sql:20-28](../../../src/internal/adapters/sqlite/migrations/063_unified_search.sql#L20-L28)) | Deterministic | None | Local only | Low if used only as a prefilter | Not enough: no passage offsets, cue ranges or per-passage BM25 |
 | Lexical-only sentence/segment scoring | Good for literal terms; weak for paraphrase and cross-language | Deterministic | None | Local only | Medium | Keep as the candidate generator and fallback, not the only ranker |
 | Embedding-only retrieval | Good semantic recall; can miss exact names, numbers and rare terms | Hard unless vectors are frozen | Needs a pinned local model or approved embedding provider | Embedding calls and storage | High | Reject as the only ranker: exact-match and citation stability suffer |
-| Hybrid lexical + embedding + optional text rerank (proposed v1) | Lexical preserves exact terms; embeddings recover paraphrases; rerank improves ordering | Deterministic with a pinned/frozen embedder and fixed rerank; fake vectors/scores only for unit tests | Same as embedding-only when remote; local model option possible | Candidate generation local; top-K embeddings + optional rerank | High | **Proposed v1** |
+| Hybrid lexical + embedding + optional text rerank (proposed v1) | Lexical preserves exact terms; a bounded semantic sweep lets a zero-overlap paraphrase reach the embedder, so paraphrases are recoverable within the sampled budget | Deterministic with a pinned/frozen embedder and fixed rerank; fake vectors/scores only for unit tests | Same as embedding-only when remote; local model option possible | Candidate generation local; top-K embeddings + bounded sweep + optional rerank | High | **Proposed v1** |
 | Hybrid + LLM reranker or query expansion | Potentially best semantic quality | Hard: extra generation and nondeterminism | Extra provider calls and credentials | Highest | Highest | Defer to [B-D06](../../debt-register.md) |
 
 The existing FTS table is **not** reused for passage scoring. It is an FTS5
@@ -120,6 +135,13 @@ score is per content row, not per passage. See
 
 - **Candidate limit:** top-K is configurable (default 100, accepted range
   20–1,000), so the embedding cost and the test surface stay bounded.
+- **Semantic sweep bound:** `maxSweepCandidates` is configurable (default 200,
+  accepted range 20–2,000) and is additionally clamped by the remaining
+  `maxEmbeddingChars`/`maxEmbeddingRequests`. `minLexicalCandidates` defaults to
+  20. The sweep is a deterministic position-stratified sample, not a random one,
+  so a frozen-vector replay stays byte-identical. The recall claim is therefore
+  "paraphrases reachable inside the sweep bound", not "any paraphrase in any
+  document size".
 - **Score:** `hybrid = lexicalWeight * lexical_norm + embeddingWeight * cosine
   + rerankWeight * rerank_norm`. Weights are user-configurable, each in `[0,1]`;
   at least one is positive; they are normalized to sum 1. Defaults: 0.35/0.65/0
@@ -506,8 +528,13 @@ a migration that has already run. B-T38 covers the old-DB upgrade/backfill.
 
 ### Positive
 
-- Hybrid retrieval recovers literal middle answers and semantic paraphrases
-  that the head/tail baseline and lexical-only paths miss.
+- Hybrid retrieval recovers literal middle answers and, within the documented
+  sweep bound, semantic paraphrases that the head/tail baseline and
+  lexical-only paths miss.
+- The sweep path is what makes a zero-overlap paraphrase reachable at all; the
+  claim is explicitly bounded by `maxSweepCandidates` and the B embedding
+  budget, and `semantic_sweep_limited` reports when the sample could not cover
+  the whole document.
 - Sentence/segment granularity gives C a precise locator and avoids dumping
   whole article blocks into the context.
 - Server-side PDF extraction makes PDF chat compatible with the same verification

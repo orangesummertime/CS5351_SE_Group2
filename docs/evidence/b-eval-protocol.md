@@ -56,6 +56,14 @@ WANG Jiaqi prepares and confirms:
   counted as a hit;
 - repeated sentences/cues and at least one question whose terms appear in a
   heading but whose answer is elsewhere, to catch title-only scoring;
+- at least two **zero-overlap paraphrase** pairs, where the gold middle passage
+  shares no query term with the question: one same-language paraphrase and one
+  cross-language pair. These are the fixtures behind AC-FR-02-19 / B-T39; they
+  must be labeled before the run and must be reported separately so a lexical
+  miss is not hidden inside the aggregate recall;
+- at least one document large enough that the deterministic semantic sweep is
+  clamped by `maxEmbeddingChars`/`maxEmbeddingRequests`; the run must report
+  `semantic_sweep_limited` and record the sampled index set and its size;
 - no real user data, credentials, cookies or private URLs; use existing fixtures
   or manually constructed text.
 
@@ -171,6 +179,9 @@ Determinism rules:
   (if enabled) and the B budget limits in the report.
 - If a PDF subset uses PaddleOCR, record the extractor version and OCR job
   configuration; do not pool OCR and native text pages without labeling them.
+- Record `minLexicalCandidates`, `maxSweepCandidates`, the sweep sampled index
+  set and whether `semantic_sweep_limited` was reported. A sweep-clamped run must
+  not be presented as an unbounded paraphrase-recall claim.
 
 ## 6. Report format
 

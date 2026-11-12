@@ -43,6 +43,7 @@ npm test -- src/features/ai/chatContext.test.ts
 | --- | --- | --- |
 | Compatibility | B-T01, B-T11 | Retrieval off must match the recorded `buildChatContext` context and response field set (wall-clock `updatedAt` normalized). |
 | Middle-answer retrieval | B-T02, B-T03, B-T04 | Article sentence/segment, subtitle cue group, PDF page/sentence. |
+| Zero-overlap paraphrase | B-T39 | Bounded deterministic semantic sweep; `semantic_sweep_limited` when the budget cannot cover the document. |
 | No match / safety | B-T05, B-T07, B-T23 | Explicit `no_match`; untrusted passage text; no head/tail masquerade. |
 | Dedupe / oversize / Unicode | B-T06, B-T08, B-T09, B-T17, B-T29 | Duplicate text, oversize segment, empty/astral input, byte cap, sentence splitter. |
 | Budget invariants | B-T10, B-T16, B-T21, B-T22 | Invalid budget, property checks, drop order, history/constraint re-injection. |
