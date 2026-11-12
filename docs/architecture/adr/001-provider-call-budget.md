@@ -1,6 +1,6 @@
 # ADR-001 · Per-invocation provider-call budget
 
-- **Status:** proposed; independent review pending.
+- **Status:** revised after CHANGES REQUIRED; independent re-review pending.
 - **Owner:** Kefan CHEN.
 - **Related:** [FR-01, NFR-01 and INV-01](../../req/requirements.yaml), [plan and tests](../../plans/a-budget-preimplementation.md), [debt](../../debt-register.md).
 
@@ -11,6 +11,8 @@ One Tangentry action may start many provider requests through summary map/reduce
 Attach a concurrency-safe per-invocation ledger to context. `internal/ai` owns limit and terminal semantics; `aichat` reserves **before each completion POST** and reconciles valid usage afterward. An omitted limit means unlimited; explicit integer 1–100 is accepted; 0, negative, non-integer or >100 is rejected before requests. This is an opt-in cap on started requests, not tokens or money. Resume is a new explicit invocation; completed checkpoints can be reused. Simultaneous chats get separate budgets. Agent-derived/Check entry points obey the same rule for provider POSTs; their exact UI/API exposure still needs review.
 
 Valid usage has nonnegative integer prompt/output/total counts with total = prompt + output. Record per-call and cumulative values. Missing, partial, malformed or inconsistent usage after a successful completion becomes `usage_unknown`; no later completion starts in that invocation. The cap and usage status are exposed through service, HTTP/SSE and UI. A blocked operation is not success; partial checkpoints stay partial. No SQLite usage ledger in v1.
+
+Streaming chat keeps the upstream request format for this proposal. The current stream request does not ask for usage, so a returned answer without valid usage is shown as `usage_unknown`, with explicit UI copy and no known-zero token count or further POST in the same invocation. The separate streaming measurement arm will show whether each provider returns usable data; this behavior must be reviewed again if the results undermine practical chat availability.
 
 ## Error classification for budgeted invocations
 

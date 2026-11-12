@@ -53,3 +53,16 @@ Per-invocation budget with resume = new explicit invocation and reusable checkpo
 
 **WANG Jiaqi** — Reviewer (GitHub: Wjq1024) — 2026-11-12 — Decision: **CHANGES REQUIRED**.
 Full evidence report (commands, file:line citations, three-state tags) retained by the reviewer and available on request.
+
+### Owner A follow-up — Kefan CHEN — 2026-11-12
+
+The reviewer decision above remains **CHANGES REQUIRED** until the reviewer re-reviews and changes it. This section records the owner's response without editing the reviewer's signed findings.
+
+- **C1:** This documentation-only PR has no OpenCode coding session or changed application source/runtime prompt. No raw OpenCode coding transcript exists for it. The course's code/prompt log gate is not triggered by this PR; the required final AI-use log and implementation transcripts remain future deliverables. The reviewer is asked to reconsider whether a separate planning-session record is required for this pre-implementation review.
+- **C2:** Issues are enabled and [Issue #3](https://github.com/orangesummertime/CS5351_SE_Group2/issues/3) tracks E's six CI gates. Main branch protection requires a pull request, one approving review, dismissal of stale approvals, approval after the latest push, conversation resolution, and administrator enforcement. The six CI gates are **not active yet**; until E implements them, the enforced interim gate is independent human approval before merge. The reviewer should not approve implementation based on nonexistent CI.
+- **C3:** INV-02 and INV-03 are registered with fit criteria linked to the reviewer's requested test IDs.
+- **C4/T2:** Streaming chat retains the current request format; the plan adds a separate streaming measurement arm and explicit `usage_unknown` UI copy. Streaming and non-streaming results remain separate. No live calls were made.
+- **C5:** INV-01 now cites project and architecture sources instead of itself; README and baseline evidence point to the reviewer's rerun.
+- **T1:** A-T22 covers agent-derived translate/summarize, Check's synthetic completion, and zero-call exemptions.
+
+**Response status:** awaiting independent re-review and live measurement before implementation. No budget implementation code has been written in this PR.

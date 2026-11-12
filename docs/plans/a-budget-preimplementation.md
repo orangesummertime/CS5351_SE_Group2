@@ -1,6 +1,6 @@
 # A · Shared provider-call budget: implementation and test plan
 
-**Status: proposed; independent review and live measurement pending. No budget implementation code exists.** This plan covers FR-01/NFR-01.
+**Status: revised after CHANGES REQUIRED; independent re-review and live measurement pending. No budget implementation code exists.** This plan covers FR-01/NFR-01.
 
 ## Baseline and proposed behavior
 
@@ -14,7 +14,9 @@ An optional integer caps **new provider completion request starts per user-trigg
 2. The adapter reserves immediately before every completion POST: `/chat/completions`, `/responses` and both streaming paths. Every fallback/retry needs another slot. `GET /models`, cached reads and history clear consume none.
 3. The [ADR error table](../architecture/adr/001-provider-call-budget.md#error-classification-for-budgeted-invocations) governs failures. A started request always consumes its slot. Ambiguous failure never silently retries. The implicit `chat.go:96` stream fallback must obtain a new reservation.
 4. Service, HTTP/SSE and UI distinguish `completed`, `budget_exhausted`, `usage_unknown`, cancellation and provider failure. Partial checkpoints cannot appear completed. A blocked terminal emits no success `event: done`.
-5. Agent-derived and Check operations count any completion POST they start under the same per-invocation rule. Zero-call Check/cache paths consume none. Entry-point and UI semantics need reviewer confirmation before code.
+5. Agent-derived and Check operations count any completion POST they start under the same per-invocation rule. Zero-call Check/cache paths consume none. The deterministic entry-point cases are specified in A-T22.
+
+For streaming chat, this proposal keeps the upstream request format and measures whether each provider returns valid usage. Because the current request does not ask for streaming usage, a visible answer with missing usage ends as `usage_unknown`, even if the text appears complete. The proposed UI copy is: “The answer was received, but usage data is unavailable. This task cannot make another AI request. Start a new task to continue.” It must not display a completed state or a known-zero token count. No claim is made that either provider supports streaming usage.
 
 Concurrent chat invocations have isolated budgets. No global cap or SQLite migration is proposed for v1. [Deferred scope](../debt-register.md) records the three cuts.
 
@@ -35,7 +37,7 @@ Fake providers or `httptest` record raw POST counts. Each row traces to a criter
 | A-T09 | INV-01, INV-02 | Timeout/cancel after start: no refund or silent retry; terminal states distinct. |
 | A-T10 | AC-FR-01-3 | Cache hit, history read/clear and invalid input make zero provider requests. |
 | A-T11 | AC-FR-01-1 | Resume capped summary/translation as a new explicit invocation; reuse only valid completed checkpoints. |
-| A-T12 | AC-FR-01-1, AC-FR-01-2 | HTTP/SSE and UI presentation: bounded/unknown/normal states, no `event: done` on blocked terminal, non-success copy, no key leak. |
+| A-T12 | AC-FR-01-1, AC-FR-01-2, INV-03 | HTTP/SSE and UI presentation: bounded/unknown/normal states, explicit streaming-chat unknown-usage copy, no `event: done` on blocked terminal, no known-zero count or key leak. |
 | A-T13 | AC-FR-01-4 | Invalid limit fails before any POST. |
 | A-T14 | AC-FR-01-5 | Two valid positive usages: exact per-call and cumulative prompt/output/total, `usageKnown=true`, `completed`. |
 | A-T15 | AC-FR-01-4 | Matrix: omitted unlimited; 1 and 100 valid; 0, negative, non-integer and 101 invalid; explicit UI label. |
@@ -45,13 +47,14 @@ Fake providers or `httptest` record raw POST counts. Each row traces to a criter
 | A-T19 | AC-FR-01-1 | Corrupted checkpoint cannot be reused as complete or bypass the new limit. |
 | A-T20 | INV-01 | Simulated crash after reservation: live invocation does not refund or start an extra POST; no durable crash-survival claim. |
 | A-T21 | AC-FR-01-2 | `usage_unknown` blocks same invocation; a new explicit invocation may resume valid completed work with a fresh limit. |
+| A-T22 | AC-INV-01-1, INV-01 | Agent-derived translate and summarize use the same reservation rule under limit 1; Check's synthetic completion counts as one slot when it starts a POST; zero-call Check/cache paths consume none. |
 
 ## Live usage-presence measurement gate
 
-**Protocol only; not executed.** Before Phase 1, obtain explicit authorization for provider identities, credentials, call/spending ceiling and network use. Run at least 20 non-streaming completions **per provider** on CityU gateway DeepSeek V4 Flash and one separately configured provider (two providers total). Use a fixed harmless short prompt and parameters. Record provider/model, endpoint family, timestamp, HTTP status, presence and validity of prompt/output/total usage, plus redacted response metadata. Do not commit credentials or user data. Report numerator/denominator separately by provider and response path; do not pool. A ≥95% valid usage presence threshold for the primary target is a **proposal requiring an explicit review decision**. If presence is lower or formats differ, reopen strict-stop design before coding. Store live evidence separately under `docs/evidence/`.
+**Protocol only; not executed.** Before Phase 1, obtain explicit authorization for provider identities, credentials, call/spending ceiling and network use. Run at least 20 non-streaming completions **per provider** on CityU gateway DeepSeek V4 Flash and one separately configured provider (two providers total). Use a fixed harmless short prompt and parameters. Add a separate streaming-chat arm for both providers, with its sample count and call/spending ceiling approved before execution. Record provider/model, endpoint family, timestamp, HTTP status, response path, presence and validity of prompt/output/total usage, plus redacted response metadata. Do not commit credentials or user data. Report numerator/denominator separately by provider and response path; do not pool streaming with non-streaming results. The reviewed ≥95% valid-usage threshold applies to the primary target's non-streaming arm; streaming results are reported separately and must inform the final decision on chat behavior. If presence is lower or formats differ, reopen strict-stop design before coding. Store live evidence separately under `docs/evidence/`.
 
 ## Implementation and review gate
 
 After live measurement and independent human approval, use course-specified OpenCode + DeepSeek V4 Flash for implementation and retain full raw sessions. Phases: domain/adapter, service/checkpoints, then HTTP/SSE/UI. After **each** phase run focused tests and full Go and frontend suites with uncached Go `-count=1`, retaining raw logs. Track existing Windows failures separately; compare like environments. Browser E2E must use only an existing or embedded browser.
 
-The new fork needs an independent non-author review of this design, test cases, and live evidence before implementation. No approval from the previous repository is carried forward.
+The new fork's reviewer requested changes. Independent non-author re-review of this design, test cases, and live evidence is required before implementation; the first review was not an approval.
