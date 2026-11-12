@@ -66,3 +66,9 @@ The reviewer decision above remains **CHANGES REQUIRED** until the reviewer re-r
 - **T1:** A-T22 covers agent-derived translate/summarize, Check's synthetic completion, and zero-call exemptions.
 
 **Response status:** awaiting independent re-review and live measurement before implementation. No budget implementation code has been written in this PR.
+
+### Owner A clarification after the subsequent review — Kefan CHEN
+
+The initial scope line above describes A-T01–A-T21 at the time of the first review. The revised plan now also contains A-T22, linked to a dedicated AC-INV-01-2 fit criterion. WANG Jiaqi approved the prior documentation commit `05b8feb`; this follow-up and the main-branch update create a new head that requires another review. The original signed findings and approval remain historical records.
+
+The authenticated owner-side repository API reported one required non-author approval, stale-review dismissal, last-push approval, conversation resolution, and administrator enforcement. The reviewer could verify only that main was protected, so these settings should be independently checked before they are used as evidence of course gate compliance. The six CI gates remain unimplemented.

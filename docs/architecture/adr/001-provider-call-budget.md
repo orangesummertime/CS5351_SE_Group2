@@ -51,4 +51,4 @@ Reopen this ADR before implementation if live measurement shows valid usage belo
 
 ## Review gate
 
-This proposal requires independent non-author approval and live evidence before implementation. The new fork has no recorded review decision for this ADR.
+PR #1 received an initial CHANGES REQUIRED review, followed by approval of the documentation-only revision at `05b8feb`. The approval did not authorize implementation. This updated revision requires a new independent review; live evidence and the implementation gate remain pending.

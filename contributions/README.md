@@ -8,5 +8,6 @@ Records start with this fork's first group commit. Each entry states the actual 
 | [002](002-owner-a-review-package.md) | `docs: prepare owner A review package` | Kefan CHEN | A baseline, candidate requirements, ADR, and test design |
 | [003](003-two-provider-protocol.md) | `docs: scope usage measurement to two providers` | Kefan CHEN | A measurement protocol scope |
 | [004](004-owner-a-review-response.md) | `docs: address owner A review findings` | Kefan CHEN | Invariants, streaming design, test plan, review response |
+| [005](005-owner-a-follow-up.md) | `docs: reconcile main and review follow-ups` | Kefan CHEN | Main synchronization and non-blocking review follow-ups |
 
 The upstream history predates this group record and is not reconstructed here.

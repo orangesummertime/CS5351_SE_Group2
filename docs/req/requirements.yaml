@@ -74,6 +74,10 @@ requirements:
         scenario: "A provider path attempts more starts than the invocation limit permits."
         expected: "The excess POST does not start; observed overshoot is zero."
         test: A-T04
+      - id: AC-INV-01-2
+        scenario: "Agent-derived translate or summarize, or Check, starts a completion POST under a one-call limit."
+        expected: "The same reservation rule applies to each started POST; zero-call paths consume no slot."
+        test: A-T22
     tradeoff: "A denied fallback may leave partial work and require a new explicit invocation."
   - id: INV-02
     type: invariant
