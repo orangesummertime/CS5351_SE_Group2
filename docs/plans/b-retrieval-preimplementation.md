@@ -622,8 +622,9 @@ them:
    `bge-m3`/1024 and how users install/start the local OpenAI-compatible server;
    custom/Bailian remain optional. No silent model download.
 2. **Weights/top-K confirmed defaults.** 0.35 lexical / 0.65 embedding / 0
-   rerank, top-K 100; users may customize. The evaluation must record and rerun
-   any deviation.
+   rerank, top-K 100 (accepted 20–1,000); users may customize. Top-K and
+   `maxSweepCandidates` are separate knobs and must never be quoted as one
+   number. The evaluation must record and rerun any deviation.
 3. **Rerank:** off by default; Bailian/custom is optional; top-N, instruct,
    weight and budget are user-configurable; scores are request-relative.
 3b. **Semantic sweep bounds:** confirm `minLexicalCandidates=20` and

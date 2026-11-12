@@ -175,7 +175,9 @@ Determinism rules:
 - A model or dimension change invalidates the vector cache and requires a rerun.
 - Record `providerKind` (local/custom/Bailian), endpoint family (not the key),
   `embeddingModel`, `dimensions`, `batchSize`, `textType`, `instruct`,
-  `modelHash`, `vectorHash`, `topK`, `hybridWeights`, rerank model/`topN`/weight
+  `modelHash`, `vectorHash`, `topK` (default 100), `minLexicalCandidates`,
+  `maxSweepCandidates` (default 200, a separate knob from `topK`),
+  `hybridWeights`, rerank model/`topN`/weight
   (if enabled) and the B budget limits in the report.
 - If a PDF subset uses PaddleOCR, record the extractor version and OCR job
   configuration; do not pool OCR and native text pages without labeling them.

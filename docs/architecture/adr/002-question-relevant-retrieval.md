@@ -139,7 +139,10 @@ score is per content row, not per passage. See
 ## Hybrid scoring and model pinning
 
 - **Candidate limit:** top-K is configurable (default 100, accepted range
-  20–1,000), so the embedding cost and the test surface stay bounded.
+  20–1,000), so the embedding cost and the test surface stay bounded. The same
+  default is used by the plan, the settings UI and the evaluation report; a
+  document that needs more candidates raises top-K or the sweep bound, never an
+  undocumented constant.
 - **Semantic sweep bound:** `maxSweepCandidates` is configurable (default 200,
   accepted range 20–2,000) and is additionally clamped by the remaining
   `maxEmbeddingChars`/`maxEmbeddingRequests`. `minLexicalCandidates` defaults to
@@ -321,7 +324,9 @@ must not silently pretend the full context was used.
    segments. Proposed segment size 1–3 sentences or 200–800 runes, with no
    overlap in v1.
 3. **Lexical candidates:** score exact normalized phrase, distinct query-term
-   coverage, saturating term frequency and proximity; keep top-K (200).
+   coverage, saturating term frequency and proximity; keep the configured top-K
+   (default 100, accepted range 20–1,000). This is the lexical shortlist that
+   step 3b may extend; it is a different knob from `maxSweepCandidates`.
 4. **Embedding/rerank:** embed the question and candidates; validate dimension
    and model identity; compute cosine; optionally call the rerank provider;
    combine with the configured/normalized weights.
