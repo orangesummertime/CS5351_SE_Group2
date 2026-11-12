@@ -1,4 +1,4 @@
-# 005 · Owner B review package: hybrid question-relevant retrieval
+# 006 · Owner B review package: hybrid question-relevant retrieval
 
 - **Commit:** `docs: prepare owner B retrieval review package`; see this file's
   Git history.
@@ -9,10 +9,10 @@
 - **Review:** Awaiting an independent non-author reviewer. No implementation,
   evaluation run or approval is claimed.
 
-> Numbering note: this branch starts from `main`, where the highest contribution
-> number is 001. The unmerged `owner/a-foundation` branch now uses 002, 003 and
-> 004, so this package uses 005 to keep the eventual merge append-only instead
-> of colliding with A's paths.
+> Numbering note: this package was written as 005 while only 001 existed on
+> `main` and A's 002–004 were still unmerged. A's records have since merged, so
+> this package was renumbered to 006 to keep the shared index append-only.
+> `main` is now fully included in this branch.
 
 ## What changed and why
 

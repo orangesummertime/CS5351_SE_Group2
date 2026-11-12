@@ -5,8 +5,12 @@ Records start with this fork's first group commit. Each entry states the actual 
 | No. | Commit | Owner | Scope |
 | --- | --- | --- | --- |
 | [001](001-group-scope.md) | `docs: restore group scope and contribution log` | Kefan CHEN | Project scope, five-part task list, contribution format |
-| [005](005-owner-b-review-package.md) | `docs: prepare owner B retrieval review package` | WANG Jiaqi | B baseline, hybrid retrieval with configurable embedding/rerank and budget, PDF/PaddleOCR design, test plan, evaluation protocol, course test layout, and AI-use disclosure |
+| [002](002-owner-a-review-package.md) | `docs: prepare owner A review package` | Kefan CHEN | A baseline, candidate requirements, ADR, and test design |
+| [003](003-two-provider-protocol.md) | `docs: scope usage measurement to two providers` | Kefan CHEN | A measurement protocol scope |
+| [004](004-owner-a-review-response.md) | `docs: address owner A review findings` | Kefan CHEN | Invariants, streaming design, test plan, review response |
+| [005](005-owner-a-follow-up.md) | `docs: reconcile main and review follow-ups` | Kefan CHEN | Main synchronization and non-blocking review follow-ups |
+| [006](006-owner-b-review-package.md) | `docs: prepare owner B retrieval review package` | WANG Jiaqi | B baseline, hybrid retrieval with configurable embedding/rerank and budget, PDF/PaddleOCR design, test plan, evaluation protocol, course test layout, and AI-use disclosure |
 
 The upstream history predates this group record and is not reconstructed here.
-Numbers 002–004 are used by the unmerged `owner/a-foundation` branch; this
-branch uses 005 so the eventual merge stays append-only.
+Numbering is append-only and shared by all owners; a new owner takes the next free
+number after the records already merged into `main`.

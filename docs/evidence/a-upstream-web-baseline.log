@@ -1,0 +1,63 @@
+node=v24.14.0 npm=11.9.0
+
+> tangentry-web@0.0.3.6 build
+> node scripts/prepare-pdf.mjs && tsc --noEmit && vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 2493 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                      1.72 kB │ gzip:   0.80 kB
+dist/assets/pdf.worker.min-CjEcRF4W.mjs          1,264.34 kB
+dist/assets/LocalVideoPlayer-DtFQldPs.css            1.62 kB │ gzip:   0.57 kB
+dist/assets/BilibiliPage-DHlWSci7.css                2.85 kB │ gzip:   0.91 kB
+dist/assets/sha2-DDiS2x7Z.css                        5.83 kB │ gzip:   1.59 kB
+dist/assets/MediaReader-C92CTvuD.css                 7.53 kB │ gzip:   1.92 kB
+dist/assets/DownloadsPage-BZV52MiV.css              17.19 kB │ gzip:   3.66 kB
+dist/assets/GlobalNotesPage-L7-lLsh0.css            21.36 kB │ gzip:   4.28 kB
+dist/assets/NotesPanel-j-7GvvWb.css                 38.17 kB │ gzip:   5.73 kB
+dist/assets/SubscriptionsPage-CAiGfUj3.css          42.07 kB │ gzip:   7.25 kB
+dist/assets/usePlaybackPosition-BjbD4I1a.css        65.59 kB │ gzip:  10.99 kB
+dist/assets/index-1vVY6yTH.css                     166.56 kB │ gzip:  28.86 kB
+dist/assets/captions-C9vbklDa.js                     0.45 kB │ gzip:   0.30 kB
+dist/assets/saveFile-BRzTunPE.js                     0.68 kB │ gzip:   0.46 kB
+dist/assets/MarkdownRenderer-DQkaAy4o.js             2.72 kB │ gzip:   1.21 kB
+dist/assets/textAnchors-Dzo4wajT.js                  2.95 kB │ gzip:   1.25 kB
+dist/assets/YouTubeReadingWorkspace-DvRZgrgi.js      3.30 kB │ gzip:   1.70 kB
+dist/assets/refresh-cw-BZB7lkg7.js                   4.83 kB │ gzip:   2.22 kB
+dist/assets/ContentReadingWorkspace-BdxroxmV.js      5.52 kB │ gzip:   2.51 kB
+dist/assets/BilibiliPage-Dp2dj5r_.js                 6.77 kB │ gzip:   2.77 kB
+dist/assets/ReadingWorkspace-b0LNunXe.js             6.90 kB │ gzip:   3.01 kB
+dist/assets/LocalVideoPlayer-BYAePHtV.js            14.45 kB │ gzip:   5.01 kB
+dist/assets/sha2-QKOoXVos.js                        18.50 kB │ gzip:   7.53 kB
+dist/assets/DownloadsPage-34WqeCba.js               24.94 kB │ gzip:   7.09 kB
+dist/assets/GlobalNotesPage-DeZSHHAI.js             38.49 kB │ gzip:  11.79 kB
+dist/assets/NotesPanel-Bf0JX23a.js                  78.49 kB │ gzip:  23.82 kB
+dist/assets/SubscriptionsPage-BzH3tIaq.js           90.82 kB │ gzip:  24.17 kB
+dist/assets/MediaReader-Dhe29_6r.js                 95.46 kB │ gzip:  29.70 kB
+dist/assets/usePlaybackPosition-DLU5RD17.js        134.29 kB │ gzip:  41.88 kB
+dist/assets/pdf-Ds3clGpF.js                        430.24 kB │ gzip: 129.30 kB
+dist/assets/index-3aKHCtCR.js                      782.79 kB │ gzip: 230.96 kB
+
+[plugin builtin:vite-reporter]
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 896ms
+
+> tangentry-web@0.0.3.6 test
+> vitest run --run
+
+
+ RUN  v5.0.5 [local checkout]/src/web
+
+
+ Test Files  61 passed (61)
+      Tests  231 passed (231)
+   Start at  20:01:36
+   Duration  2.50s (import 49%, transform 38%, tests 8%, worker 5%)
+
+    Isolate  61 workers spawned · ~303ms startup each (spawn + environment, per file)
+             at least ~930ms faster with isolate: false — reuses workers across files instead of one per file

@@ -66,7 +66,7 @@ entries:
         - "test/README.md"
         - "test/offline/README.md"
         - "test/live/README.md"
-        - "contributions/005-owner-b-review-package.md"
+        - "contributions/006-owner-b-review-package.md"
         - "contributions/README.md (index row only)"
         - "README.md (B owner and assignment text only)"
         - "docs/ai-use-log.yaml (this file)"
