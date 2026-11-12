@@ -1,0 +1,141 @@
+version: 1
+status: draft
+scope: owner-a-only
+baseline_commit: 45611ad0e214a2d9de6f0ec5a5aa84fc493d76f2
+note: "Only A's candidates are registered. Group-wide requirements and independent approval are still pending."
+requirements:
+  - id: FR-01
+    type: functional
+    owner: A
+    approval: pending
+    priority: Must
+    source:
+      - "../../README.md"
+      - "../plans/a-budget-preimplementation.md"
+      - "../../src/internal/adapters/aichat/protocol.go"
+    statement: "A user can set a maximum number of provider completion requests for one AI invocation and see completed, budget_exhausted or usage_unknown status."
+    fit:
+      - id: AC-FR-01-1
+        scenario: "A one-call limit is set for a summary that needs two provider requests."
+        expected: "Exactly one completion request starts; the next request is blocked and the result reports budget_exhausted with resumable partial progress."
+        test: A-T02
+      - id: AC-FR-01-2
+        scenario: "A successful provider response has no valid usage data and the operation has more work."
+        expected: "The result reports usage_unknown and no further completion request starts in that invocation."
+        test: A-T08
+      - id: AC-FR-01-3
+        scenario: "The client omits the optional limit."
+        expected: "Existing chat, summary and translation behavior remains compatible."
+        test: A-T01
+      - id: AC-FR-01-4
+        scenario: "The user omits a limit or supplies 0, a negative number, a non-integer or a number above 100."
+        expected: "Omission is explicitly labeled unlimited; invalid values are rejected before any provider POST."
+        test: A-T15
+      - id: AC-FR-01-5
+        scenario: "Two completions return valid positive prompt, output and total usage."
+        expected: "Per-call and cumulative values reconcile exactly, usageKnown is true and the operation completes."
+        test: A-T14
+    tradeoff: "The limit is per user-triggered invocation; resuming is a new invocation. Tokens are observed after a response, so the UI must not claim a hard token or money ceiling."
+  - id: NFR-01
+    type: nonfunctional
+    owner: A
+    approval: pending
+    priority: Must
+    source:
+      - "../../README.md"
+      - "../architecture/adr/001-provider-call-budget.md"
+      - "../../src/internal/adapters/aichat/protocol.go"
+    statement: "The configured per-invocation call limit holds under concurrent reservations, retries and provider fallbacks."
+    metric: "completion_request_starts_above_limit"
+    threshold: 0
+    method: "Deterministic httptest provider records every /chat/completions and /responses POST; run A-T04 to A-T09, including concurrent reservations and unknown-usage cases."
+    fit:
+      - id: AC-NFR-01-1
+        scenario: "A fallback or retry would require a request beyond the configured limit."
+        expected: "No extra POST starts, including on /responses, JSON-mode retry and chat stream fallback."
+        test: A-T04
+      - id: AC-NFR-01-2
+        scenario: "Two workers reserve the last available call concurrently."
+        expected: "At most one reservation succeeds and the observed overshoot count is zero."
+        test: A-T07
+    tradeoff: "Strict unknown-usage stopping can reduce availability on compatible providers that omit usage; the reviewer must approve or revise this before implementation."
+  - id: INV-01
+    type: invariant
+    owner: A
+    approval: pending
+    priority: Must
+    source:
+      - "../../README.md"
+      - "../architecture/adr/001-provider-call-budget.md#invariants"
+    related: ["NFR-01"]
+    statement: "Started completion POSTs never exceed the configured limit in one invocation, even across concurrent reservations, retry and fallback."
+    fit:
+      - id: AC-INV-01-1
+        scenario: "A provider path attempts more starts than the invocation limit permits."
+        expected: "The excess POST does not start; observed overshoot is zero."
+        test: A-T04
+      - id: AC-INV-01-2
+        scenario: "Agent-derived translate or summarize, or Check, starts a completion POST under a one-call limit."
+        expected: "The same reservation rule applies to each started POST; zero-call paths consume no slot."
+        test: A-T22
+    tradeoff: "A denied fallback may leave partial work and require a new explicit invocation."
+  - id: INV-02
+    type: invariant
+    owner: A
+    approval: pending
+    priority: Must
+    source:
+      - "../architecture/adr/001-provider-call-budget.md#invariants"
+      - "../plans/a-budget-preimplementation.md"
+    related: ["FR-01"]
+    statement: "Unknown or invalid provider usage is never presented as known zero and is never followed by another completion POST in the same invocation."
+    fit:
+      - id: AC-INV-02-1
+        scenario: "A completion response has missing, partial, negative or malformed usage."
+        expected: "The result reports usage_unknown, never reports known zero, and starts no further completion POST in that invocation."
+        test: A-T08
+      - id: AC-INV-02-2
+        scenario: "A timeout or ambiguous response leaves consumption unknown."
+        expected: "No automatic retry starts; terminal state and slot accounting follow the ADR error table."
+        test: A-T17
+      - id: AC-INV-02-3
+        scenario: "A request times out or is cancelled after it starts."
+        expected: "Its slot is not refunded and no automatic retry starts."
+        test: A-T09
+      - id: AC-INV-02-4
+        scenario: "An invocation enters usage_unknown and the user explicitly resumes later."
+        expected: "The original invocation starts no more POSTs; only a new invocation may resume valid completed work."
+        test: A-T21
+    tradeoff: "Strict stopping can reduce availability when a provider omits usage."
+  - id: INV-03
+    type: invariant
+    owner: A
+    approval: pending
+    priority: Must
+    source:
+      - "../architecture/adr/001-provider-call-budget.md#invariants"
+      - "../plans/a-budget-preimplementation.md"
+    related: ["FR-01"]
+    statement: "A blocked, failed or interrupted invocation never emits a completed result."
+    fit:
+      - id: AC-INV-03-1
+        scenario: "The call limit blocks a fallback or later summary request."
+        expected: "The operation exposes a non-success terminal state and emits no success event."
+        test: A-T06
+      - id: AC-INV-03-2
+        scenario: "The client disconnects during a streaming response."
+        expected: "No completed UI state or success event is produced after interruption."
+        test: A-T18
+      - id: AC-INV-03-3
+        scenario: "A two-group summary reaches its one-call limit after the first request."
+        expected: "The partial checkpoint remains incomplete and the result reports budget_exhausted."
+        test: A-T02
+      - id: AC-INV-03-4
+        scenario: "HTTP/SSE or UI presents a blocked or unknown terminal state."
+        expected: "The interface shows the non-success state and emits no success event."
+        test: A-T12
+      - id: AC-INV-03-5
+        scenario: "A saved checkpoint is corrupt and cannot be safely resumed."
+        expected: "The checkpoint is not treated as complete and cannot yield a false completed result."
+        test: A-T19
+    tradeoff: "Partial work remains visibly incomplete until a new explicit invocation resumes it."
