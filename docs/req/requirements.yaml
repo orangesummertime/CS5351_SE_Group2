@@ -4,7 +4,7 @@ scope: owner-b-only
 baseline_commit: 45611ad0e214a2d9de6f0ec5a5aa84fc493d76f2
 note: >-
   Only B's FR-02, NFR-02, INV-04 and INV-05 are registered here. A's
-  FR-01/NFR-01/INV-01 and A's requested INV-02/INV-03 are intentionally not
+  FR-01/NFR-01/INV-01 and A's registered INV-02/INV-03 are intentionally not
   duplicated. On merge with owner/a-foundation, append entries rather than
   replacing the registry; this file uses the same schema superset and the
   B invariants start at 04 to avoid the A numbering space. The proposed B v1
