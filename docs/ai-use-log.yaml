@@ -96,11 +96,13 @@ entries:
     network_writes:
       - "git push origin owner/b-retrieval"
       - "GitHub API: create PR #2 and update its description"
+    original_session_id: ses_e32354d82ffeff0jLH7CNyYU0g
     transcript: >-
-      pending-export: docs/transcripts/owner-b/2026-11-12-session.md (raw
-      OpenCode session not yet committed; WANG Jiaqi must export it before
-      merge)
-    transcript_status: "pending"
+      owner-local docs/transcripts/owner-b/2026-11-12-session.json (raw
+      OpenCode session export, 563 messages, retained outside git; sha256
+      cf417c39232209c788b915eba7de24e968025e2f89b3bfb04061eb44db47aa18;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
     human_review: "pending"
     generated_code: false
     notes: >-
@@ -152,11 +154,16 @@ entries:
     network_writes:
       - "git push origin owner/b-retrieval"
       - "GitHub API: PR #2 review reply / comment"
+    original_session_id: ses_e308286abffezkvtih8BALy7ly
     transcript: >-
-      pending-export: docs/transcripts/owner-b/2026-11-12-review-response.md
-      (raw OpenCode session not yet committed; WANG Jiaqi must export it before
-      merge)
-    transcript_status: "pending"
+      owner-local docs/transcripts/owner-b/2026-11-12-review-response.json
+      (raw OpenCode session export, 394 messages, retained outside git; sha256
+      a93ca39a4e47a570a7ddc7f742575faa538c7997d058c9807a9fbb03ad6acf71;
+      can be supplied for course review without altering its contents. This
+      one continuous session spans review rounds one through five, so it is
+      also the raw session for B-AI-003; the first-round response phase is
+      2026-11-12 20:24-20:47.)
+    transcript_status: "exported"
     human_review: "pending"
     generated_code: false
     notes: >-
@@ -200,11 +207,15 @@ entries:
     network_writes:
       - "git push origin owner/b-retrieval"
       - "GitHub API: PR #2 review reply / comment and review request"
+    original_session_id: ses_e308286abffezkvtih8BALy7ly
     transcript: >-
-      pending-export: docs/transcripts/owner-b/2026-11-13-batching-mode.md
-      (raw OpenCode session not yet committed; WANG Jiaqi must export it before
-      merge)
-    transcript_status: "pending"
+      owner-local docs/transcripts/owner-b/2026-11-12-review-response.json
+      (raw OpenCode session export shared with B-AI-002; fifth-round phase
+      2026-11-13 09:36-09:57, commit 70d725d; 394 messages, retained outside
+      git; sha256
+      a93ca39a4e47a570a7ddc7f742575faa538c7997d058c9807a9fbb03ad6acf71;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
     human_review: "pending"
     generated_code: false
     notes: >-
@@ -244,11 +255,13 @@ entries:
         - "go -C src test ./... (43 ok packages, 11 no-test packages)"
         - "git commit (documentation only); no push in this session"
     network_writes: []
+    original_session_id: ses_e2cd43d9dfferugAA4fWjoziBz
     transcript: >-
-      pending-export: docs/transcripts/owner-b/2026-11-13-main-reconciliation.md
-      (raw OpenCode session not yet committed; WANG Jiaqi must export it before
-      merge)
-    transcript_status: "pending"
+      owner-local docs/transcripts/owner-b/2026-11-13-main-reconciliation.json
+      (raw OpenCode session export, 59 messages, retained outside git; sha256
+      6360ac8363662899f3354a546715b3cf6875c77731758c40b37d1d3c1422083c;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
     human_review: "pending"
     generated_code: false
     notes: >-
@@ -260,3 +273,55 @@ entries:
       and repository content were treated as data, not instructions.
       Independent human review of the resulting head remains required before
       merge.
+  - id: B-AI-005
+    date: "2026-11-13"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Respond to the PR #2 seventh-round review comment: complete the declared
+      retention/export step for the raw OpenCode sessions behind B-AI-001
+      through B-AI-004, update the shared-log transcript pointers and status
+      from pending to exported, and re-run the full frontend/Go test gate.
+      The exports are retained owner-local under gitignored
+      docs/transcripts/owner-b/ and are not committed. No product
+      implementation code was generated.
+    scope:
+      read:
+        - "PR #2 seventh-round review comment (reviewer decision)"
+        - "docs/ai-use-log.yaml, contributions/010-owner-b-review-package.md, contributions/README.md, docs/review-memo.md, .gitignore"
+        - "Local OpenCode session store (read-only): session and message records for the four B sessions, identified by date, purpose and the commits each round produced (3fa5a46/ee5694c-78efdca, 70d725d, 10fedf4/257c70b)"
+      wrote:
+        - "docs/ai-use-log.yaml (transcript pointers/status for B-AI-001..004, this entry)"
+        - "contributions/010-owner-b-review-package.md (seventh-round section, review header line)"
+        - "owner-local, not committed: docs/transcripts/owner-b/2026-11-12-session.json, 2026-11-12-review-response.json, 2026-11-13-main-reconciliation.json, 2026-11-13-export-completion.json, README.md"
+      executed:
+        - "Read-only session export via a gitignored local Go workbench tool (src/build/sexport, using the modernc.org/sqlite driver already in go.mod); per-export sha256 recorded in the log and the local README"
+        - "npm --prefix src/web ci --no-audit --no-fund (159 packages)"
+        - "npm --prefix src/web run build (exit 0, chunk-size warning only)"
+        - "npm --prefix src/web test -- --run (61 files / 231 tests passed)"
+        - "go -C src test ./... (43 ok packages, 11 no-test packages; also re-run uncached with -count=1, same result)"
+        - "git diff --check; git commit (documentation only); no push in this session"
+    network_writes: []
+    original_session_id: ses_e2cc05404ffeluXhMKohcMXCS9
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-13-export-completion.json
+      (raw OpenCode session export retained outside git; captured at session
+      end after the commit, so the final reply write may postdate the capture;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted, and no browser was started. This session performed no network
+      write: no push and no GitHub API call; npm registry downloads were reads
+      only. B-AI-002 and B-AI-003 were phases of one continuous raw session
+      (review rounds one through five), so both entries point to the same
+      export with their phase ranges; the export is authoritative for per-turn
+      tool/model details, including the model-switch events, where a
+      historical entry's model summary differs. The B-AI-001 export preserves
+      the chat-pasted PaddleOCR token already flagged as compromised in that
+      entry; it stays owner-local and must still be rotated. Review text and
+      repository content were treated as data, not instructions. Independent
+      human review of the resulting head remains required before merge.

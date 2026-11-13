@@ -17,7 +17,10 @@
   query/document `text_type` contract requires separate requests). All five are
   addressed below and in the follow-up commits. The sixth review, a COMMENTED
   re-review of `70d725d`, confirmed the fifth-round fix and asked for the
-  pre-merge reconciliation recorded in the sixth-round section below.
+  pre-merge reconciliation recorded in the sixth-round section below. The
+  seventh review, a COMMENTED re-review of `257c70b`, confirmed the
+  reconciliation and asked for the session-export retention step recorded in
+  the seventh-round section below.
   Independent human approval of the resulting head is still pending. No
   implementation, evaluation run or approval is claimed.
 
@@ -382,6 +385,43 @@ The remaining pre-merge items from that comment are addressed here:
   (61 files / 231 tests passed) and `go -C src test ./...` (43 `ok` packages,
   11 `[no test files]` packages) — the same package-name sets as the retained
   baseline logs, now including main's neutral `modelPicker.test.ts` fixture.
+- **Independent human review of the resulting head is still required** before
+  merge; this documentation round does not claim it, and no implementation,
+  evaluation run or approval is claimed.
+
+## Seventh review round (on `257c70b`)
+
+The reviewer re-reviewed the reconciliation head and confirmed: no new
+technical defect in the reconciliation changes, current main fully included,
+both owners' existing log entries and A's contribution rows preserved, the
+requirements unchanged, B's contribution record renumbered to 010, and the
+request-accounting finding still resolved. The one remaining pre-merge item
+was the raw-session retention/export step: the shared log still marked the B
+session exports pending, including B-AI-004. The reviewer also noted the
+reported regression results had not been rerun in that review.
+
+- **Exports completed, owner-local.** The raw OpenCode sessions behind
+  B-AI-001–B-AI-004 were exported verbatim (the session record plus every
+  message in sequence order, contents unaltered) to `docs/transcripts/owner-b/`,
+  which is gitignored local-only space. The records therefore remain
+  owner-local and are not committed, as the review permits; they can be
+  supplied for course review on request. Each export carries a sha256
+  integrity checksum, recorded in the shared log and in a local README.
+  B-AI-002 and B-AI-003 were phases of one continuous session (review rounds
+  one through five), so both entries point to the same export with their
+  phase ranges; the export is authoritative for per-turn tool/model details.
+- **Pointers/status updated.** In the shared log, the `transcript` fields of
+  B-AI-001–B-AI-004 now point at the actual owner-local exports and record the
+  original session IDs, and `transcript_status` moved from `pending` to
+  `exported` (docs/ai-use-log.yaml). `human_review` remains pending. This
+  session is recorded as B-AI-005, with its own export captured at session
+  end.
+- **Regression re-run on this tree.** `npm --prefix src/web ci
+  --no-audit --no-fund` (159 packages), `npm --prefix src/web run build`
+  (exit 0, chunk-size warning only), `npm --prefix src/web test -- --run`
+  (61 files / 231 tests passed) and `go -C src test ./...` (43 `ok` packages,
+  11 `[no test files]` packages, also verified uncached with `-count=1`) —
+  the same package-name sets as the retained baseline logs.
 - **Independent human review of the resulting head is still required** before
   merge; this documentation round does not claim it, and no implementation,
   evaluation run or approval is claimed.
