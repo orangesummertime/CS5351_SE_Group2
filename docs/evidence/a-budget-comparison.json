@@ -1,0 +1,233 @@
+{
+  "providerUsage": {
+    "output": 3,
+    "total": 5,
+    "prompt": 2
+  },
+  "baselineLimitSemantics": "The harness sets the optional property by reflection. Upstream has no such property, so its applied limit is always omitted. Requested limits 1 and 3 are repeated unbounded controls, not configured upstream limits. The original API rejects the unknown JSON field.",
+  "scope": "Deterministic service-workflow comparison through real local Chat HTTP transport and scripted valid provider results. No live provider, prompt-decoding, answer-quality or speed-improvement claim.",
+  "inputHashes": "Recorded 16-hex SHA-256 prefixes; identical task inputs across runs.",
+  "measuredDate": "2026-11-13",
+  "upstreamCommit": "45611ad0e214a2d9de6f0ec5a5aa84fc493d76f2",
+  "runs": [
+    {
+      "version": "current",
+      "records": [
+        {
+          "complete": true,
+          "completedCalls": 3,
+          "elapsedMs": 5,
+          "error": "",
+          "inputHash": "749b0c7205f3c779",
+          "kind": "summary",
+          "limit": "omitted",
+          "providerPosts": 3,
+          "status": "completed",
+          "totalCalls": 3,
+          "version": "current",
+          "requestedLimit": "omitted",
+          "appliedLimit": "omitted"
+        },
+        {
+          "complete": true,
+          "elapsedMs": 2,
+          "error": "",
+          "inputHash": "eb11ca80760d40ce",
+          "kind": "translation",
+          "limit": "omitted",
+          "providerPosts": 2,
+          "status": "completed",
+          "texts": 16,
+          "total": 16,
+          "version": "current",
+          "requestedLimit": "omitted",
+          "appliedLimit": "omitted"
+        },
+        {
+          "budgetCumulative": {
+            "output": 3,
+            "prompt": 2,
+            "total": 5
+          },
+          "budgetStarted": 1,
+          "budgetUsageKnown": true,
+          "complete": false,
+          "completedCalls": 1,
+          "elapsedMs": 2,
+          "error": "AI provider call budget exhausted",
+          "inputHash": "749b0c7205f3c779",
+          "kind": "summary",
+          "limit": 1,
+          "providerPosts": 1,
+          "status": "budget_exhausted",
+          "totalCalls": 3,
+          "version": "current",
+          "requestedLimit": 1,
+          "appliedLimit": 1
+        },
+        {
+          "budgetCumulative": {
+            "output": 3,
+            "prompt": 2,
+            "total": 5
+          },
+          "budgetStarted": 1,
+          "budgetUsageKnown": true,
+          "complete": false,
+          "elapsedMs": 2,
+          "error": "AI provider call budget exhausted",
+          "inputHash": "eb11ca80760d40ce",
+          "kind": "translation",
+          "limit": 1,
+          "providerPosts": 1,
+          "status": "budget_exhausted",
+          "texts": 8,
+          "total": 16,
+          "version": "current",
+          "requestedLimit": 1,
+          "appliedLimit": 1
+        },
+        {
+          "budgetCumulative": {
+            "output": 9,
+            "prompt": 6,
+            "total": 15
+          },
+          "budgetStarted": 3,
+          "budgetUsageKnown": true,
+          "complete": true,
+          "completedCalls": 3,
+          "elapsedMs": 4,
+          "error": "",
+          "inputHash": "749b0c7205f3c779",
+          "kind": "summary",
+          "limit": 3,
+          "providerPosts": 3,
+          "status": "completed",
+          "totalCalls": 3,
+          "version": "current",
+          "requestedLimit": 3,
+          "appliedLimit": 3
+        },
+        {
+          "budgetCumulative": {
+            "output": 6,
+            "prompt": 4,
+            "total": 10
+          },
+          "budgetStarted": 2,
+          "budgetUsageKnown": true,
+          "complete": true,
+          "elapsedMs": 3,
+          "error": "",
+          "inputHash": "eb11ca80760d40ce",
+          "kind": "translation",
+          "limit": 3,
+          "providerPosts": 2,
+          "status": "completed",
+          "texts": 16,
+          "total": 16,
+          "version": "current",
+          "requestedLimit": 3,
+          "appliedLimit": 3
+        }
+      ]
+    },
+    {
+      "version": "upstream-45611ad",
+      "records": [
+        {
+          "complete": true,
+          "completedCalls": 3,
+          "elapsedMs": 5,
+          "error": "",
+          "inputHash": "749b0c7205f3c779",
+          "kind": "summary",
+          "limit": "omitted",
+          "providerPosts": 3,
+          "status": "completed",
+          "totalCalls": 3,
+          "version": "baseline-upstream",
+          "requestedLimit": "omitted",
+          "appliedLimit": "omitted"
+        },
+        {
+          "complete": true,
+          "elapsedMs": 3,
+          "error": "",
+          "inputHash": "eb11ca80760d40ce",
+          "kind": "translation",
+          "limit": "omitted",
+          "providerPosts": 2,
+          "status": "completed",
+          "texts": 16,
+          "total": 16,
+          "version": "baseline-upstream",
+          "requestedLimit": "omitted",
+          "appliedLimit": "omitted"
+        },
+        {
+          "complete": true,
+          "completedCalls": 3,
+          "elapsedMs": 4,
+          "error": "",
+          "inputHash": "749b0c7205f3c779",
+          "kind": "summary",
+          "limit": 1,
+          "providerPosts": 3,
+          "status": "completed",
+          "totalCalls": 3,
+          "version": "baseline-upstream",
+          "requestedLimit": 1,
+          "appliedLimit": "omitted"
+        },
+        {
+          "complete": true,
+          "elapsedMs": 2,
+          "error": "",
+          "inputHash": "eb11ca80760d40ce",
+          "kind": "translation",
+          "limit": 1,
+          "providerPosts": 2,
+          "status": "completed",
+          "texts": 16,
+          "total": 16,
+          "version": "baseline-upstream",
+          "requestedLimit": 1,
+          "appliedLimit": "omitted"
+        },
+        {
+          "complete": true,
+          "completedCalls": 3,
+          "elapsedMs": 3,
+          "error": "",
+          "inputHash": "749b0c7205f3c779",
+          "kind": "summary",
+          "limit": 3,
+          "providerPosts": 3,
+          "status": "completed",
+          "totalCalls": 3,
+          "version": "baseline-upstream",
+          "requestedLimit": 3,
+          "appliedLimit": "omitted"
+        },
+        {
+          "complete": true,
+          "elapsedMs": 2,
+          "error": "",
+          "inputHash": "eb11ca80760d40ce",
+          "kind": "translation",
+          "limit": 3,
+          "providerPosts": 2,
+          "status": "completed",
+          "texts": 16,
+          "total": 16,
+          "version": "baseline-upstream",
+          "requestedLimit": 3,
+          "appliedLimit": "omitted"
+        }
+      ]
+    }
+  ],
+  "baselineVerification": "Tracked internal/ai and internal/adapters/aichat files match the pinned upstream commit (read-only diff empty)."
+}

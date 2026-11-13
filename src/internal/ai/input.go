@@ -11,12 +11,13 @@ import (
 // silently treating an omitted/null start as a real zero-second position.
 func (in *Input) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		Source         string  `json:"source"`
-		ContentID      *string `json:"contentId"`
-		TargetLanguage string  `json:"targetLanguage"`
-		Revision       *int64  `json:"revision"`
-		Regenerate     bool    `json:"regenerate"`
-		Track          *struct {
+		Source           string  `json:"source"`
+		ContentID        *string `json:"contentId"`
+		TargetLanguage   string  `json:"targetLanguage"`
+		Revision         *int64  `json:"revision"`
+		Regenerate       bool    `json:"regenerate"`
+		MaxProviderCalls *int    `json:"maxProviderCalls"`
+		Track            *struct {
 			Language  *string `json:"language"`
 			Label     string  `json:"label"`
 			Automatic bool    `json:"automatic"`
@@ -49,12 +50,13 @@ func (in *Input) UnmarshalJSON(data []byte) error {
 		track.Cues[i] = subtitles.Cue{Start: *cue.Start, End: *cue.End, Text: *cue.Text}
 	}
 	*in = Input{
-		ContentID:      *raw.ContentID,
-		Revision:       *raw.Revision,
-		Track:          track,
-		Source:         raw.Source,
-		TargetLanguage: raw.TargetLanguage,
-		Regenerate:     raw.Regenerate,
+		ContentID:        *raw.ContentID,
+		Revision:         *raw.Revision,
+		Track:            track,
+		Source:           raw.Source,
+		TargetLanguage:   raw.TargetLanguage,
+		Regenerate:       raw.Regenerate,
+		MaxProviderCalls: raw.MaxProviderCalls,
 	}
 	return nil
 }

@@ -13,5 +13,6 @@ Records start with this fork's first group commit. Each entry states the actual 
 | [007](007-owner-a-adr-alignment.md) | `docs: align A decision record with live evidence` | Kefan CHEN | ADR status, streaming evidence, and review gate |
 | [008](008-owner-a-integration-inventory.md) | `docs: map A provider-call integration boundaries` | Kefan CHEN | HTTP, service and provider call map for shared budget review |
 | [009](009-owner-a-readme-status.md) | `docs: mark completed owner A work in README` | Kefan CHEN | Evidence-based A checklist status and pending PR labels |
+| [011](011-owner-a-budget-implementation.md) | `feat: add per-invocation AI provider call budgets` | Kefan CHEN | Invocation ledger, adapter/service/HTTP/UI integration, tests and measured comparison |
 
 The upstream history predates this group record and is not reconstructed here.

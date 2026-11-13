@@ -53,7 +53,11 @@ var (
 	ErrTranslationLanguage = errors.New("AI provider cannot determine target translation language")
 	ErrGatewayTimeout      = errors.New("AI provider gateway timed out")
 	ErrFormat              = errors.New("AI returned invalid translations")
-	ErrIncomplete          = fmt.Errorf("AI batch omitted segments: %w", ErrFormat)
+	// ErrEmptyCompletion reports a stream that ended without any usable content:
+	// demonstrably no generation occurred, so the non-stream fallback is safe.
+	// It wraps ErrFormat to preserve upstream classification.
+	ErrEmptyCompletion = fmt.Errorf("AI stream ended without content: %w", ErrFormat)
+	ErrIncomplete      = fmt.Errorf("AI batch omitted segments: %w", ErrFormat)
 	ErrTruncated           = fmt.Errorf("AI output exceeded the token limit: %w", ErrFormat)
 	ErrRefused             = fmt.Errorf("AI provider declined the task: %w", ErrFormat)
 	ErrNotFound            = errors.New("AI translation not found")

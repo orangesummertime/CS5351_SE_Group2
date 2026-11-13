@@ -83,6 +83,7 @@ export interface SummaryResult {
   totalCalls: number; completedCalls: number; complete: boolean
   overview?: string; points?: SummaryPoint[]; citations?: SummaryCitation[]; outline?: SummaryOutline[]; updatedAt: number
   formatVersion?: number | string; document?: SummaryDocument; progress?: SummaryProgress
+  budget?: AIBudgetReport
 }
 export interface SummaryInspection { settings: AISettings; result: SummaryResult; active: boolean }
-import type { AISettings } from './types'
+import type { AISettings, AIBudgetReport } from './types'

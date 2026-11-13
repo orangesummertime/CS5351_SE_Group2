@@ -1,6 +1,6 @@
 # ADR-001 · Per-invocation provider-call budget
 
-- **Status:** design approved in PR #1; live evidence in PR #4 awaits independent review before implementation.
+- **Status:** design approved in PR #1; evidence approved and merged in PR #4; implementation prepared for review following group confirmation on 2026-11-13.
 - **Owner:** Kefan CHEN.
 - **Related:** [FR-01, NFR-01 and INV-01](../../req/requirements.yaml), [plan and tests](../../plans/a-budget-preimplementation.md), [debt](../../debt-register.md).
 
@@ -51,4 +51,4 @@ Reopen this ADR before implementation if live measurement shows valid usage belo
 
 ## Review gate
 
-PR #1 received an initial CHANGES REQUIRED review, followed by independent approval of the final documentation-only revision and merge. That approval did not authorize implementation. PR #4 presents the live evidence for independent review; the implementation gate remains pending.
+PR #1 received an initial CHANGES REQUIRED review, followed by independent approval of the final documentation-only revision and merge. PR #4's live evidence and PR #5's inventory were later approved and merged; those reviews explicitly excluded implementation approval. The group member subsequently confirmed proceeding under the existing A plan on 2026-11-13. Implementation changes remain subject to their own review and verification before merge.

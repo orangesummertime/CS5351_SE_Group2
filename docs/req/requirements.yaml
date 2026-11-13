@@ -1,13 +1,13 @@
 version: 1
-status: draft
+status: approved
 scope: owner-a-only
 baseline_commit: 45611ad0e214a2d9de6f0ec5a5aa84fc493d76f2
-note: "Only A's candidates are registered. Group-wide requirements and independent approval are still pending."
+note: "A-only requirements: the group confirmed implementation under the existing A plan on 2026-11-13. This does not approve final implementation acceptance or the other owners' requirements."
 requirements:
   - id: FR-01
     type: functional
     owner: A
-    approval: pending
+    approval: approved
     priority: Must
     source:
       - "../../README.md"
@@ -39,7 +39,7 @@ requirements:
   - id: NFR-01
     type: nonfunctional
     owner: A
-    approval: pending
+    approval: approved
     priority: Must
     source:
       - "../../README.md"
@@ -62,7 +62,7 @@ requirements:
   - id: INV-01
     type: invariant
     owner: A
-    approval: pending
+    approval: approved
     priority: Must
     source:
       - "../../README.md"
@@ -82,7 +82,7 @@ requirements:
   - id: INV-02
     type: invariant
     owner: A
-    approval: pending
+    approval: approved
     priority: Must
     source:
       - "../architecture/adr/001-provider-call-budget.md#invariants"
@@ -110,7 +110,7 @@ requirements:
   - id: INV-03
     type: invariant
     owner: A
-    approval: pending
+    approval: approved
     priority: Must
     source:
       - "../architecture/adr/001-provider-call-budget.md#invariants"

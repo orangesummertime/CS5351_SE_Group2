@@ -1,10 +1,12 @@
 package httptransport
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"tangentry/internal/ai"
 )
@@ -39,7 +41,11 @@ func (h *aiHandler) aiSummaryGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.ai.AI.SummaryGenerate(r.Context(), input)
 	if err != nil {
-		summaryFail(w, err)
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		status, body := classifySummaryError(err)
+		writeAIBudgetError(w, status, body, result.Budget, summaryPartial(result))
 		return
 	}
 	write(w, 200, result)
@@ -123,18 +129,33 @@ func (h *aiHandler) aiChat(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.ai.AI.Chat(r.Context(), input)
 	if err != nil {
-		chatFail(w, err)
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		status, body := classifyChatError(err)
+		writeAIBudgetError(w, status, body, result.Budget, chatPartial(result))
 		return
 	}
 	write(w, http.StatusOK, result)
 }
 
 func (h *aiHandler) aiChatStream(w http.ResponseWriter, r *http.Request, input ai.ChatRequest) {
+	// Reject an invalid call limit before committing SSE success headers so the
+	// client receives a normal JSON 400 instead of a half-open stream.
+	if input.MaxProviderCalls != nil && (*input.MaxProviderCalls < 1 || *input.MaxProviderCalls > ai.MaxBudgetedCalls) {
+		status, body := classifyChatError(ai.ErrInvalid)
+		write(w, status, body)
+		return
+	}
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		result, err := h.ai.AI.Chat(r.Context(), input)
 		if err != nil {
-			chatFail(w, err)
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+			status, body := classifyChatError(err)
+			writeAIBudgetError(w, status, body, result.Budget, chatPartial(result))
 			return
 		}
 		write(w, http.StatusOK, result)
@@ -145,7 +166,9 @@ func (h *aiHandler) aiChatStream(w http.ResponseWriter, r *http.Request, input a
 	w.Header().Set("Connection", "keep-alive")
 	w.WriteHeader(http.StatusOK)
 	flusher.Flush()
+	var forwarded strings.Builder
 	result, err := h.ai.AI.ChatStream(r.Context(), input, func(chunk string) error {
+		forwarded.WriteString(chunk)
 		payload, marshalErr := json.Marshal(map[string]string{"delta": chunk})
 		if marshalErr != nil {
 			return marshalErr
@@ -157,8 +180,31 @@ func (h *aiHandler) aiChatStream(w http.ResponseWriter, r *http.Request, input a
 		return nil
 	})
 	if err != nil {
-		payload, _ := json.Marshal(map[string]string{"error": aiErrorMessage(err)})
+		if errors.Is(err, context.Canceled) {
+			// Client disconnected; do not attempt a terminal frame.
+			return
+		}
+		// The stream error terminal carries the budget report and the partial
+		// text already forwarded, and never emits event: done.
+		status, body := classifyChatError(err)
+		terminal := map[string]any{"error": body.Message, "code": body.Code, "status": "error", "httpStatus": status}
+		if result.Budget != nil {
+			terminal["budget"] = result.Budget
+			terminal["status"] = result.Budget.Status
+		} else {
+			terminal["status"] = terminalStatusFromError(err)
+		}
+		terminal["partial"] = forwarded.String()
+		payload, _ := json.Marshal(terminal)
 		_, _ = fmt.Fprintf(w, "data: %s\n\n", payload)
+		flusher.Flush()
+		return
+	}
+	if result.Budget != nil {
+		// Limited success: include the additive budget report and completion
+		// status while keeping the existing chat result fields.
+		payload, _ := json.Marshal(aiBudgetedChatResult{ChatResult: result, Status: "completed"})
+		_, _ = fmt.Fprintf(w, "event: done\ndata: %s\n\n", payload)
 		flusher.Flush()
 		return
 	}

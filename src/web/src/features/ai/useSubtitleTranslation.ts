@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { request } from '../../shared/api/client'
+import { APIError, request } from '../../shared/api/client'
 import type { SubtitleTrack } from '../../shared/api/types'
-import type { TranslationInspection, TranslationResult } from './types'
+import type { AIBudgetReport, TranslationInspection, TranslationResult } from './types'
+import { buildTranslationRequest, budgetReportFromErrorPayload, parseCallLimit } from './callBudget'
 import { usePageVisibility } from '../../shared/hooks/usePageVisibility'
 import { preferredSubtitleLanguage, subtitleTargetLabel, subtitleTrackMatchesTarget } from '../subtitles/subtitleLanguageMatch'
 import type { SubtitleLanguage } from '../../shared/api/types'
@@ -16,6 +17,8 @@ export function useSubtitleTranslation(contentId: string, track?: SubtitleTrack,
   const [dataScope, setDataScope] = useState('')
   const [loading, setLoading] = useState(false), [pending, setPending] = useState(false)
   const [error, setError] = useState(''), [notice, setNotice] = useState(''), [show, setShow] = useState(true)
+  const [callLimitInput, setCallLimitInput] = useState('')
+  const [budget, setBudget] = useState<AIBudgetReport | undefined>(undefined)
   const reader = useRef<AbortController | null>(null), mutation = useRef<AbortController | null>(null)
   const refreshOnReturn = useRef<() => void>(() => {})
   refreshOnReturn.current = () => {
@@ -74,9 +77,11 @@ export function useSubtitleTranslation(contentId: string, track?: SubtitleTrack,
   // regenerate replaces the stored translation with one from the current model.
   async function translate(regenerate = false) {
     if (alreadyTarget || nativeAvailable || !track || !inspection || dataScope !== scope || pending || mutation.current || inspection.active || inspection.settings.translating) return
+    const parsedLimit = parseCallLimit(callLimitInput)
+    if (!parsedLimit.ok) { setError(parsedLimit.message); return }
     const current = new AbortController(); mutation.current = current
     const requestedScope = scope, snapshot = inspection
-    setPending(true); setError(''); setNotice(''); setShow(true)
+    setPending(true); setError(''); setNotice(''); setShow(true); setBudget(undefined)
     if (regenerate) setInspection({ ...snapshot, result: { ...snapshot.result, texts: [] } })
     let timer: ReturnType<typeof setTimeout> | undefined
     async function progress() {
@@ -89,10 +94,14 @@ export function useSubtitleTranslation(contentId: string, track?: SubtitleTrack,
     }
     timer = setTimeout(() => void progress(), 700)
     try {
-      const value = await request<TranslationResult>('/ai/subtitles/translate', { method: 'POST', signal: current.signal, body: JSON.stringify({ contentId, track, source, targetLanguage, revision: snapshot.settings.revision, ...(regenerate ? { regenerate } : {}) }) })
-      if (!current.signal.aborted && liveScope.current === requestedScope) { setInspection({ ...snapshot, result: value, active: false }); setNotice(`${subtitleTargetLabel(targetLanguage)}译文已保存到本机。`) }
+      const value = await request<TranslationResult>('/ai/subtitles/translate', { method: 'POST', signal: current.signal, body: JSON.stringify(buildTranslationRequest({ contentId, track, source, targetLanguage, revision: snapshot.settings.revision }, parsedLimit.value, regenerate)) })
+      if (!current.signal.aborted && liveScope.current === requestedScope) { setInspection({ ...snapshot, result: value, active: false }); setNotice(`${subtitleTargetLabel(targetLanguage)}译文已保存到本机。`); setBudget(value.budget) }
     } catch (cause) {
       if (!current.signal.aborted && liveScope.current === requestedScope) {
+        if (cause instanceof APIError) {
+          const report = budgetReportFromErrorPayload(cause.payload)
+          if (report) setBudget(report)
+        }
         // Recover only already committed batches. Never retry the model call.
         try { const value = await request<TranslationResult>(`/ai/subtitles/${snapshot.result.key}`, { signal: current.signal }); if (!current.signal.aborted && liveScope.current === requestedScope) setInspection({ ...snapshot, result: value, active: false }) } catch { /* preserve confirmed data */ }
         if (!current.signal.aborted && liveScope.current === requestedScope) setError(cause instanceof Error ? cause.message : '翻译未完成，已完成部分仍保留。')
@@ -107,5 +116,6 @@ export function useSubtitleTranslation(contentId: string, track?: SubtitleTrack,
     mutation.current?.abort(); mutation.current = null; setPending(false)
     setNotice('已取消翻译，已完成部分保留。'); void reload()
   }
-  return { alreadyChinese: alreadyTarget, alreadyTarget, nativeAvailable, targetLanguage, inspection: !alreadyTarget && !nativeAvailable && dataScope === scope ? inspection : null, loading: loading && !nativeAvailable, pending: pending && !nativeAvailable, error: nativeAvailable ? '' : error, notice: nativeAvailable ? '' : notice, show: show && !alreadyTarget && !nativeAvailable, setShow, reload, translate, cancel }
+  const callLimitError = (() => { const parsed = parseCallLimit(callLimitInput); return parsed.ok ? '' : parsed.message })()
+  return { alreadyChinese: alreadyTarget, alreadyTarget, nativeAvailable, targetLanguage, inspection: !alreadyTarget && !nativeAvailable && dataScope === scope ? inspection : null, loading: loading && !nativeAvailable, pending: pending && !nativeAvailable, error: nativeAvailable ? '' : error, notice: nativeAvailable ? '' : notice, show: show && !alreadyTarget && !nativeAvailable, setShow, budget, callLimitInput, setCallLimitInput, callLimitError, reload, translate, cancel }
 }

@@ -1,6 +1,6 @@
 # A · Integration contract inventory for the provider-call budget
 
-**Status:** owner-side inventory for parallel review; no implementation code or final wire schema is approved here. This document derives the shared boundary from the approved [A plan](a-budget-preimplementation.md), [ADR-001](../architecture/adr/001-provider-call-budget.md), and current source. The live [usage evidence](../evidence/a-live-usage-presence.md) is reviewed separately in PR #4.
+**Status:** inventory reviewed and merged in PR #5; live evidence reviewed and merged in PR #4. Implementation follows group confirmation of the existing A plan on 2026-11-13 and remains subject to its own PR review. This document derives the shared boundary from the [A plan](a-budget-preimplementation.md), [ADR-001](../architecture/adr/001-provider-call-budget.md), and current source.
 
 ## Existing entry points and effects
 
@@ -19,7 +19,7 @@ Source anchors: [routes](../../src/internal/transport/http/routes_ai.go), [chat 
 ## Shared boundary for A and other owners
 
 1. `internal/ai` owns a per-invocation, concurrency-safe ledger and the terminal state. The adapter must reserve before transport starts. A service-layer count of planned batches is insufficient because one batch may retry or fall back.
-2. The existing call signatures and JSON/SSE shapes remain the compatibility baseline when the optional call limit is omitted. The concrete added wire fields are intentionally left for the reviewed implementation revision; this inventory does not invent them.
+2. Existing JSON/SSE shapes remain the compatibility baseline when the optional call limit is omitted. The implementation adds optional `maxProviderCalls` (integer 1–100) to task inputs and an optional `budget` report to limited results/errors. The implementation PR reviews these additive fields; this inventory's earlier approval did not approve them in advance.
 3. A result with missing, partial, malformed or inconsistent usage is `usage_unknown`, never a known zero. In that invocation, no later completion POST starts. The [CityU stream sample](../evidence/a-live-usage-presence.md) shows why this state must be visible.
 4. Budget exhaustion, unknown usage, cancellation, provider failure and completed output must remain distinguishable through service, HTTP/SSE and UI. A partial summary or translation checkpoint must not be exposed as complete.
 5. B, C and D may add AI-backed operations. Before any such path is implemented, its owner and A should map its invocation boundary and every provider completion POST to the same reservation rule. E's source invalidation work does not change the budget semantics by itself.
@@ -30,4 +30,4 @@ Source anchors: [routes](../../src/internal/transport/http/routes_ai.go), [chat 
 - Confirm whether Agent-derived operations gain any new completion path; current capability reporting alone starts none.
 - Review the final response and SSE field names together with the focused HTTP/UI tests, while retaining upstream behavior when the limit is omitted.
 
-This inventory can be reviewed while PR #4's measurement evidence is under review. It is not a substitute for the independent approval required before implementation.
+The inventory and live evidence are now merged. B, C and D must map any future completion entry points to this same boundary before integration; the current implementation does not claim to verify features that those owners have not implemented yet.

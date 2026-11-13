@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { request } from '../../shared/api/client'
+import { APIError, request } from '../../shared/api/client'
 import type { SubtitleTrack } from '../../shared/api/types'
 import type { SummaryInspection, SummaryResult } from './summaryTypes'
+import type { AIBudgetReport } from './types'
 import { summaryGenerationBlockedReason } from './summaryPresentation'
+import { buildSummaryRequest, budgetReportFromErrorPayload, parseCallLimit } from './callBudget'
 import { usePageVisibility } from '../../shared/hooks/usePageVisibility'
 import { notifyNotesChanged } from '../notes/changes'
 
@@ -31,6 +33,8 @@ export function useSummary(contentId: string, source: string, track?: SubtitleTr
   const [dataScope, setDataScope] = useState('')
   const [loading, setLoading] = useState(false), [pending, setPending] = useState(false)
   const [error, setError] = useState(''), [notice, setNotice] = useState('')
+  const [callLimitInput, setCallLimitInput] = useState('')
+  const [budget, setBudget] = useState<AIBudgetReport | undefined>(undefined)
   const readController = useRef<AbortController | null>(null), mutation = useRef<AbortController | null>(null)
   const reload = async () => {
     if (!input) return
@@ -96,8 +100,10 @@ export function useSummary(contentId: string, source: string, track?: SubtitleTr
       return
     }
     if (!input || !inspection) return
+    const parsedLimit = parseCallLimit(callLimitInput)
+    if (!parsedLimit.ok) { setError(parsedLimit.message); return }
     const controller = new AbortController(); mutation.current = controller; const requestedScope = scope; const snapshot = inspection
-    setPending(true); setError(''); setNotice('')
+    setPending(true); setError(''); setNotice(''); setBudget(undefined)
     if (regenerate) setInspection({ ...snapshot, result: { ...snapshot.result, complete: false, completedCalls: 0, overview: undefined, points: undefined, citations: undefined } })
     let timer: ReturnType<typeof setTimeout> | undefined
     const progress = async () => {
@@ -107,18 +113,24 @@ export function useSummary(contentId: string, source: string, track?: SubtitleTr
     }
     timer = setTimeout(() => void progress(), 700)
     try {
-      const value = await request<SummaryResult>('/ai/summaries/generate', { method: 'POST', signal: controller.signal, body: JSON.stringify({ ...input, revision: snapshot.settings.revision, ...(regenerate ? { regenerate } : {}) }) })
+      const value = await request<SummaryResult>('/ai/summaries/generate', { method: 'POST', signal: controller.signal, body: JSON.stringify(buildSummaryRequest(input as unknown as Record<string, unknown>, snapshot.settings.revision, parsedLimit.value, regenerate)) })
       if (!controller.signal.aborted && liveScope.current === requestedScope) {
         setInspection({ ...snapshot, result: value, active: false }); setNotice('摘要已保存到本机。')
+        setBudget(value.budget)
         notifyNotesChanged(value.contentId)
       }
     } catch (cause) {
       if (!controller.signal.aborted && liveScope.current === requestedScope) {
+        if (cause instanceof APIError) {
+          const report = budgetReportFromErrorPayload(cause.payload)
+          if (report) setBudget(report)
+        }
         try { const value = await request<SummaryResult>(`/ai/summaries/${snapshot.result.key}`, { signal: controller.signal }); if (!controller.signal.aborted && liveScope.current === requestedScope) setInspection({ ...snapshot, result: value, active: false }) } catch { /* keep committed progress */ }
         if (!controller.signal.aborted && liveScope.current === requestedScope) setError(cause instanceof Error ? cause.message : '摘要未完成，已完成部分仍保留。')
       }
     } finally { if (timer) clearTimeout(timer); controller.abort(); if (mutation.current === controller) { mutation.current = null; if (liveScope.current === requestedScope) setPending(false) } }
   }
   function cancel() { mutation.current?.abort(); mutation.current = null; setPending(false); setNotice('已取消摘要，已完成部分保留。'); void reload() }
-  return { contentId, input, hasInput: Boolean(input), inspection: dataScope === scope ? inspection : null, loading, pending, error, notice, reload, generate, cancel, onSeek }
+  const callLimitError = (() => { const parsed = parseCallLimit(callLimitInput); return parsed.ok ? '' : parsed.message })()
+  return { contentId, input, hasInput: Boolean(input), inspection: dataScope === scope ? inspection : null, loading, pending, error, notice, budget, callLimitInput, setCallLimitInput, callLimitError, reload, generate, cancel, onSeek }
 }
