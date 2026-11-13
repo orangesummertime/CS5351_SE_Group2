@@ -21,7 +21,7 @@
 | 职责 | 成员 | 负责范围 | 主要接口／目录 |
 | --- | --- | --- | --- |
 | A：基线、集成与预算 | Kefan CHEN | 原版复现、共享 AI 用量预算、模块接口和整体集成 | `src/internal/ai/`、`src/internal/adapters/aichat/`、`src/internal/app/` |
-| B：问题相关检索 | 待认领 | 为长内容问答选择相关原文片段，记录检索依据 | `src/internal/ai/`、`src/web/src/features/ai/chatContext.ts` |
+| B：问题相关检索 | Yuyan CHEN | 为长内容问答选择相关原文片段，记录检索依据 | `src/internal/ai/`、`src/web/src/features/ai/chatContext.ts` |
 | C：问答引用核验 | 待认领 | 结构化引用、服务端核验、前端来源展示与跳转 | `src/internal/ai/chat.go`、`src/internal/transport/http/`、`src/web/src/features/ai/` |
 | D：多内容比较 | Wenlong Lu | 用户选定内容的比较问答、逐来源证据和冲突／不足提示 | `src/internal/content/`、`src/internal/ai/`、`src/web/src/features/ai/` |
 | E：版本状态与验证治理 | 待认领 | 内容变更后的引用失效／过期状态、CI 门槛和交付核对 | `src/internal/ai/`、`src/internal/adapters/sqlite/`、`.github/workflows/` |
