@@ -20,7 +20,10 @@
   pre-merge reconciliation recorded in the sixth-round section below. The
   seventh review, a COMMENTED re-review of `257c70b`, confirmed the
   reconciliation and asked for the session-export retention step recorded in
-  the seventh-round section below.
+  the seventh-round section below. The eighth review, a COMMENTED re-review of
+  `077e93b`, confirmed the retention/export step addressed and requested no
+  further source change; its outcome is recorded in the eighth-round section
+  below.
   Independent human approval of the resulting head is still pending. No
   implementation, evaluation run or approval is claimed.
 
@@ -425,6 +428,39 @@ reported regression results had not been rerun in that review.
 - **Independent human review of the resulting head is still required** before
   merge; this documentation round does not claim it, and no implementation,
   evaluation run or approval is claimed.
+
+## Eighth review round (on `077e93b`)
+
+The reviewer re-reviewed the export-retention head and confirmed: the declared
+retention/export item is addressed; the shared log records the original session
+IDs and owner-local export pointers for B-AI-001–B-AI-005, identifies the
+shared session behind B-AI-002/B-AI-003, and marks the exports retained; the
+latest diff changed only the shared log and this record; and the previously
+resolved design and reconciliation findings remain resolved. No new technical
+blocker was found, and no further source change was requested. Accordingly this
+round makes no design or product-code change; it only records the session and
+the review outcome, keeping the shared log and this record append-only.
+
+The review noted two coverage limits, addressed here without altering any
+export:
+
+- **Exports not opened in the review.** The four retained owner-local exports
+  were re-verified by sha256 against the checksums recorded in the shared log
+  and the local README; all four match, so the exports are intact and
+  unaltered. They remain owner-local under gitignored
+  `docs/transcripts/owner-b/` and can be supplied for course review on request.
+- **Regression suite not independently rerun.** The full gate was re-run on
+  this tree: `npm --prefix src/web ci --no-audit --no-fund` (159 packages),
+  `npm --prefix src/web run build` (exit 0, chunk-size warning only),
+  `npm --prefix src/web test -- --run` (61 files / 231 tests passed) and
+  `go -C src test ./...` (43 `ok` packages, 11 `[no test files]` packages,
+  also verified uncached with `-count=1`) — the same package-name sets as the
+  retained baseline logs.
+
+This session is recorded as B-AI-006, with its own export captured at session
+end. **Independent human review of the resulting head is still required**
+before merge; this documentation round does not claim it, and no
+implementation, evaluation run or approval is claimed.
 
 ## Presentation explanation
 

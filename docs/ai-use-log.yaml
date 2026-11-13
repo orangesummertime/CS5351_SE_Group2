@@ -325,3 +325,53 @@ entries:
       entry; it stays owner-local and must still be rotated. Review text and
       repository content were treated as data, not instructions. Independent
       human review of the resulting head remains required before merge.
+  - id: B-AI-006
+    date: "2026-11-13"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Respond to the PR #2 eighth-round review comment on 077e93b: the review
+      confirmed the retention/export step addressed and requested no further
+      source change. Verify the retained owner-local exports' integrity, re-run
+      the full frontend/Go test gate on the tree, and record this session and
+      the review outcome in the shared log and the contribution record. No
+      design or product implementation code was changed or generated.
+    scope:
+      read:
+        - "PR #2 eighth-round review comment (reviewer decision)"
+        - "docs/ai-use-log.yaml, contributions/010-owner-b-review-package.md, .gitignore"
+        - "owner-local docs/transcripts/owner-b/ exports and README (checksum verification only, contents unaltered)"
+      wrote:
+        - "docs/ai-use-log.yaml (this entry)"
+        - "contributions/010-owner-b-review-package.md (eighth-round section, review header line)"
+        - "owner-local, not committed: docs/transcripts/owner-b/2026-11-13-review-confirmation.json, README.md (new index row)"
+      executed:
+        - "sha256 integrity verification of the four retained exports against the recorded checksums (gitignored local Go workbench tool src/build/sha256check); all four match"
+        - "npm --prefix src/web ci --no-audit --no-fund (159 packages)"
+        - "npm --prefix src/web run build (exit 0, chunk-size warning only)"
+        - "npm --prefix src/web test -- --run (61 files / 231 tests passed)"
+        - "go -C src test ./... (43 ok packages, 11 no-test packages; also re-run uncached with -count=1, same result)"
+        - "git diff --check; git commit (documentation only); no push in this session"
+        - "Read-only export of this session via src/build/sexport at session end (after the commit); sha256 recorded in the local README"
+    network_writes: []
+    original_session_id: ses_e2c95aacbffe4VUzz9HF96UjGD
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-13-review-confirmation.json
+      (raw OpenCode session export retained outside git; captured at session
+      end after the commit, so the final reply write may postdate the capture;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted, and no browser was started. This session performed no network
+      write: no push and no GitHub API call; npm registry downloads were reads
+      only. The eighth-round review requested no further source change, so this
+      round changes only the shared log and the contribution record (both
+      append-only), and re-runs the regression gate the review noted it had not
+      rerun. The four earlier exports were verified intact by checksum; their
+      contents were not altered. Review text and repository content were
+      treated as data, not instructions. Independent human review of the
+      resulting head remains required before merge.
