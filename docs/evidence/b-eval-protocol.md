@@ -162,10 +162,12 @@ with the same code-point counting rule, not the raw `String.length` value.
 
 The stable default configuration is local-first: local OpenAI-compatible
 embedding (`bge-m3`/1024 recommended), top-K 100, weights 0.35/0.65/0, rerank
-off, B budget 24 embedding requests / 100,000 characters (191 candidates: 100
-lexical + 90 sweep + question), local PaddleOCR. The
-evaluation may use a different approved configuration, but it must record the
-deviation.
+off, B budget 100,000 characters and a mode-specific request limit (24 `shared` /
+25 `split`) delivering 190 candidates (100 lexical + 90 sweep) plus the question,
+local PaddleOCR. A local server without `text_type` is `shared`; a
+DashScope/Bailian `text_type=query/document` provider is `split`. The evaluation
+may use a different approved configuration, but it must record the deviation,
+including the batching mode.
 
 The hybrid run must use one of:
 
@@ -191,23 +193,28 @@ Determinism rules:
   (if enabled) and the B budget limits in the report.
 - If a PDF subset uses PaddleOCR, record the extractor version and OCR job
   configuration; do not pool OCR and native text pages without labeling them.
-- Record `sweepCandidates`, `sweepRatio`, the derived `embeddingSlotBudget` and
+- Record the **batching mode** (`shared`/`split`), `sweepCandidates`, `sweepRatio`,
+  the mode-specific derived `embeddingSlotBudget` and the mode-independent
   `embeddingCharBudget`, the resulting `sweepSlots`/`lexicalSlots` and
-  `sweepChars`/`lexicalChars`, the spare slot count, the sampled index set,
-  `stride`, `sweepCoverage`, and any zero-coverage reason (`sweep_zero_slots`,
-  `sweep_disabled_by_config`). Assert and report the cap invariants
-  `sweepSlots <= sweepCandidates` and `lexicalSlots <= topK`. A run with
+  `sweepChars`/`lexicalChars`, the spare slot count, the **observed cold-cache
+  embedding request count and the role/`text_type` of each request**, the sampled
+  index set, `stride`, `sweepCoverage`, and any zero-coverage reason
+  (`sweep_zero_slots`, `sweep_disabled_by_config`). Assert and report the cap
+  invariants `sweepSlots <= sweepCandidates` and `lexicalSlots <= topK`, and that
+  the request count is `ceil((1+C)/B)` in `shared` mode and `1 + ceil(C/B)` in
+  `split` mode and never exceeds `maxEmbeddingRequests`. A run with
   `sweepCoverage < 1` must not be presented as an unbounded paraphrase-recall
   claim: report the zero-overlap recall **at that coverage**, and report the
   distractor-saturated subset separately from the degenerate-lexical subset.
 - Run at least one **budget-starved configuration** (for example
   `maxEmbeddingRequests=1`), one **character-bound configuration**, and one
   **high-budget configuration** (for example `maxEmbeddingRequests=25` with
-  `topK=100`, `sweepCandidates=90`), and report the resulting shares. These runs
-  exist to prove the shares stay nonnegative and within budget, that the sweep
-  never exceeds `sweepCandidates` even when the request budget is large, and that
-  character pressure does not silently take the sweep's allowance; they are not
-  part of the 120k recall denominator.
+  `topK=100`, `sweepCandidates=90`), **in each batching mode**, and report the
+  resulting shares and request counts. These runs exist to prove the shares stay
+  nonnegative and within budget, that the sweep never exceeds `sweepCandidates`
+  even when the request budget is large, that the query request is reserved
+  separately in `split` mode, and that character pressure does not silently take
+  the sweep's allowance; they are not part of the 120k recall denominator.
 
 ## 6. Report format
 

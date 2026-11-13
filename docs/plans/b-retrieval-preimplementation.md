@@ -105,10 +105,34 @@ Sentence/segment rules:
 ### Embedding and selection signatures
 
 ```go
+type EmbedRole string
+
+const (
+    EmbedQuery    EmbedRole = "query"    // the question
+    EmbedDocument EmbedRole = "document" // source passages
+)
+
+// BatchingMode reports whether the question and passages can share one request.
+type BatchingMode string
+
+const (
+    // BatchingShared: question and passages use the same request-level config
+    // (e.g. a local OpenAI-compatible server without text_type) and batch together.
+    BatchingShared BatchingMode = "shared"
+    // BatchingSplit: question uses text_type=query and passages text_type=document
+    // (DashScope/Bailian). Different request-level configs cannot share a batch;
+    // the query request is reserved separately.
+    BatchingSplit BatchingMode = "split"
+)
+
 type Embedder interface {
     ModelID() string
     Dimensions() int
-    Embed(ctx context.Context, texts []string) ([][]float32, error)
+    BatchingMode() BatchingMode
+    // Embed embeds texts for one role. In BatchingSplit the adapter sets
+    // text_type=query for EmbedQuery and text_type=document for EmbedDocument,
+    // and the caller must never mix roles in a single request.
+    Embed(ctx context.Context, texts []string, role EmbedRole) ([][]float32, error)
 }
 
 type SelectionStatus string
@@ -231,7 +255,7 @@ Proposed additive request fields on the existing chat endpoint:
     "enabled": true,
     "mode": "hybrid",
     "maxChars": 120000,
-    "embeddingBudget": {"maxRequests": 24, "maxChars": 100000, "sweepCandidates": 90},
+    "embeddingBudget": {"batchingMode": "shared", "maxRequests": 24, "maxChars": 100000, "sweepCandidates": 90},
     "rerankBudget": {"maxRequests": 2}
   }
 }
@@ -303,52 +327,82 @@ OpenAI-compatible `/embeddings` or rerank endpoint, key optional, dimensions
 validated. Bailian guidance: workspace ID, API key, model and documented
 dimension choices; the provider notes record the limits.
 
-Default B budget: `maxEmbeddingRequests=24`, `maxEmbeddingChars=100000`,
-`maxRerankRequests=0` (rerank off), top-K 100, sweep 90, batch 8.
+Default B budget: `maxEmbeddingChars=100000`, `maxRerankRequests=0` (rerank off),
+top-K 100, sweep 90, batch 8. `maxEmbeddingRequests` is **mode-specific** so the
+advertised 90 sweep + 100 lexical quota is delivered by default in both batching
+modes: **24 in `shared` mode, 25 in `split` mode** (see below).
 
-Both limits are derived rather than asserted, and the shares are proportional so
-they can never go negative or overflow:
+**Batching mode.** The embedder reports `BatchingMode()`:
+- `shared`: the question and passages use the same request-level configuration
+  (for example a local OpenAI-compatible server with no `text_type`), so they can
+  share a batch. The question occupies one slot in the shared batch.
+- `split`: the question uses `text_type=query` (plus optional query-only
+  `instruct`) and passages use `text_type=document` (DashScope/Bailian). These are
+  different request-level configurations and **cannot share a batch**; one request
+  is reserved for the query and the remaining requests carry document batches.
+
+Both limits are derived from the actual batching mode rather than asserted, and
+the shares are proportional and capped so they can never go negative or overflow:
 
 ```text
-embeddingSlotBudget = max(0, maxEmbeddingRequests * batchSize - 1)   // 1 = question
-embeddingCharBudget = max(0, maxEmbeddingChars - questionChars)
-sweepRatio          = sweepCandidates / (topK + sweepCandidates)    // 0 if denom 0
+R = maxEmbeddingRequests, B = batchSize
+embeddingSlotBudget = shared ? max(0, R*B - 1)          // question shares a batch
+                             : max(0, (R - 1)*B)        // 1 request reserved for query
+embeddingCharBudget = max(0, maxEmbeddingChars - questionChars)   // mode-independent
+sweepRatio          = sweepCandidates / (topK + sweepCandidates)  // 0 if denom 0
 sweepSlots          = min(sweepCandidates, floor(embeddingSlotBudget * sweepRatio))
 lexicalSlots        = min(topK, embeddingSlotBudget - sweepSlots)
 sweepChars          = floor(embeddingCharBudget * sweepRatio)
-lexicalChars        = embeddingCharBudget - sweepChars               // >= 0
+lexicalChars        = embeddingCharBudget - sweepChars             // >= 0
 ```
 
-Two guards, for the two failure modes this section has had:
-- A subtraction like `min(topK, budget - sweepCandidates)` is not used: with
-  `maxEmbeddingRequests=1` and `sweepCandidates=90` it yields a negative lexical
-  share and then assigns 90 sweep candidates to a 7-slot budget. The proportional
-  form gives 3 sweep / 4 lexical out of 7.
-- The proportional result is **capped at the configured quota**: without the cap,
-  `maxEmbeddingRequests=25` gives a 199-slot budget and `floor(199*90/190)=94`
-  sweep slots, exceeding the requested `sweepCandidates=90`. With the cap the
-  sweep is 90, lexical is `min(100, 199-90)=100`, and 9 slots stay spare. A larger
-  request budget widens the spare headroom but never the candidate counts.
+**Cold-cache request count** (C = candidates actually embedded, C <= slotBudget):
+- `shared`: `ceil((1 + C) / B)` — the question is one more text in the batch.
+- `split`: `1 + ceil(C / B)` — one query request plus document batches.
+
+Embedding proceeds only when `embeddingSlotBudget >= 1`; if it is 0 there is no
+candidate capacity, so no query or document request is made and the path falls
+back to `lexical_only` with `embedding_budget_exhausted` (no wasted query call).
+
+Three guards, for the failure modes this section has had:
+- A subtraction like `min(topK, budget - sweepCandidates)` is not used: it can go
+  negative. The proportional form gives 3 sweep / 4 lexical out of a 7-slot budget.
+- The proportional result is **capped at the configured quota**: without the cap a
+  large budget yields `floor(199*90/190)=94` sweep slots, exceeding
+  `sweepCandidates=90`. With the cap the sweep is 90 and lexical 100, remainder spare.
+- **The slot budget is mode-aware**: the old single formula `R*B - 1` assumed the
+  question shares a batch. In `split` mode that under-counts: limit 1 / batch 8 /
+  7 passages needs 1 query + 1 document = 2 requests, and limit 24 / 190 passages
+  needs 1 + ceil(190/8) = 25. The mode-specific derivation reserves the query and
+  never advertises capacity the request limit cannot fund.
 
 Invariants: `sweepSlots >= 0`, `lexicalSlots >= 0`, `sweepSlots <= sweepCandidates`,
 `lexicalSlots <= topK`, `sweepSlots + lexicalSlots <= embeddingSlotBudget`, and
 `sweepChars + lexicalChars == embeddingCharBudget` with both `>= 0`. **Unused slots
 stay spare**; they are not turned into extra candidates beyond `sweepCandidates`
 or `topK`. The sweep's character allowance is an upper bound it may not fully use
-once its count cap binds.
+once its count cap binds. The character budget is mode-independent; only the slot
+(request-count) budget depends on the batching mode.
 
 Each side selects up to its own slot count and stops when its own character
 allowance is exhausted. Character pressure therefore shrinks both sides
 proportionally; it never consumes the sweep's reserved slots, so lexical
 distractors cannot starve the sweep back to zero.
 
-With the defaults (`maxEmbeddingRequests=24`, `batchSize=8`, `topK=100`,
-`sweepCandidates=90`, `maxEmbeddingChars=100000`): slot budget **191**,
-`sweepRatio = 90/190`, `sweepSlots = min(90, 90) = 90`,
-`lexicalSlots = min(100, 101) = 100` — 190 of 191 slots used, one spare; character
-split about 47,300 sweep / 52,600 lexical, which holds 90 passages of roughly 500
-runes. A document longer than 90 sampled segments reports `semantic_sweep_limited`
-with `sweepCoverage = S/N`.
+Worked defaults (`batchSize=8`, `topK=100`, `sweepCandidates=90`,
+`maxEmbeddingChars=100000`, `sweepRatio=90/190`):
+- `shared`, `maxEmbeddingRequests=24`: slot budget **191**, sweep 90 / lexical 100
+  (190 used, 1 spare); cold-cache requests `ceil(191/8)=24`.
+- `split`, `maxEmbeddingRequests=25`: slot budget **192**, sweep 90 / lexical 100
+  (190 used, 2 spare); cold-cache requests `1+ceil(190/8)=25`.
+- `split`, `maxEmbeddingRequests=24` (user-lowered): slot budget **184**, sweep
+  `min(90,floor(184*90/190))=87` / lexical `min(100,97)=97` (184 used); requests
+  `1+ceil(184/8)=24`. The advertised coverage shrinks with the budget and is
+  reported, never silently promised at 90/100.
+
+Character split is about 47,300 sweep / 52,600 lexical, holding 90 passages of
+roughly 500 runes. A document longer than the sampled sweep reports
+`semantic_sweep_limited` with `sweepCoverage = S/N`.
 
 **Zero-coverage outcome.** If `sweepCandidates=0`, or the computed `sweepSlots` or
 `sweepChars` cannot hold one passage, then `S=0` and the result carries
@@ -582,9 +636,9 @@ Assertions use exact counts/bytes/IDs rather than only a final status.
 | B-T28 | AC-FR-02-10 | PDF document hash changes: old page rows and old passage IDs are invalid; new extraction uses the new hash; old citations are `stale_source`. |
 | B-T29 | AC-FR-02-2, AC-FR-02-3 | Sentence/segment splitter: CJK punctuation, Latin abbreviations, quotes, code blocks, emoji and boundary runes; no empty/duplicate segments, no split surrogate, and every range maps back to exact source text. |
 | B-T30 | AC-NFR-02-3, AC-FR-02-12 | Embedding cache: same `(contentId, sourceVersion, passageId, modelId, dimensions)` hits; model/source/dimension change misses; no vector from a different dimension/model is used. |
-| B-T31 | AC-FR-02-13 | Embedding settings: local OpenAI-compatible, custom remote and Bailian preset; custom base URL/key/model/dimensions/batch/text_type/instruct; test connection validates returned dimension; key is masked and never returned; a wrong dimension/model is rejected with an actionable error. |
+| B-T31 | AC-FR-02-13 | Embedding settings: local OpenAI-compatible, custom remote and Bailian preset; custom base URL/key/model/dimensions/batch/text_type/instruct; test connection validates returned dimension; key is masked and never returned; a wrong dimension/model is rejected with an actionable error. **Role/batching contract:** the adapter reports `BatchingMode()` (`shared` for a local server without `text_type`, `split` for DashScope/Bailian `text_type=query/document`); `Embed` sets `text_type` by role (`query` for the question, `document` for passages) and applies the optional query-only `instruct`; in `split` mode it never mixes query and document texts in one request. |
 | B-T32 | AC-FR-02-14 | Custom weights: lexical/embedding/rerank each in [0,1], at least one positive; sum is normalized; all-zero/negative/NaN/Inf rejected; changing weights changes ranking deterministically and is recorded in the report. |
-| B-T33 | AC-FR-02-15 | B retrieval budget: `maxEmbeddingRequests`, `maxRerankRequests`, `maxEmbeddingChars`; statuses `completed`/`embedding_budget_limited`/`embedding_budget_exhausted`/`rerank_budget_exhausted`/`embedding_usage_unknown`; A's ledger is untouched; limited/exhausted falls back with explicit status; enabling rerank with zero rerank budget requires a positive value or keeps rerank off. **Request-budget validation rule:** `maxEmbeddingRequests`/`maxRerankRequests` accept 0 as "off" (embedding off → `lexical_only`; rerank off → no rerank POST); a negative, non-integer, NaN or Inf value is rejected as `invalid_budget` before any embedding/rerank request; `maxEmbeddingChars` must be a positive integer. **Low-budget matrix (the share arithmetic must never go negative or overflow):** `maxEmbeddingRequests=1, batchSize=8, sweepCandidates=90` gives `embeddingSlotBudget=7`, `sweepSlots=3`, `lexicalSlots=4` — assert both are `>= 0`, `sweepSlots + lexicalSlots == 7`, `sweepSlots + lexicalSlots + 1 question <= 8` (one request), and that the observed request count is 1. `maxEmbeddingRequests=0` gives a 0 slot budget: assert no embedding request at all, `lexical_only`, `embedding_budget_exhausted`. `maxEmbeddingRequests=-1` asserts `invalid_budget` before any request. `sweepCandidates=0` asserts `semantic_sweep_limited` with reason `sweep_disabled_by_config` and no zero-overlap claim. Character-bound zero-sweep case: `maxEmbeddingChars=1040`, question 40 chars, 500-rune passages gives `embeddingCharBudget=1000`, `sweepChars=473 < 500` and `lexicalChars=527 >= 500` — assert reason `sweep_zero_slots`, `sweepCoverage=0`, exactly one lexical passage embedded and zero sweep candidates. **High-budget cap case:** `topK=100, sweepCandidates=90, batchSize=8, maxEmbeddingRequests=25` gives `embeddingSlotBudget=199`; assert `sweepSlots == 90` (the configured quota, **not** the uncapped `floor(199*90/190)=94`), `lexicalSlots == 100`, `sweepSlots + lexicalSlots == 190 <= 199`, and 9 spare slots; repeat with `maxEmbeddingRequests=100` (budget 799) and assert the sweep is still 90 and lexical still 100, so a larger request budget never exceeds the configured candidate counts. |
+| B-T33 | AC-FR-02-15 | B retrieval budget: `maxEmbeddingRequests`, `maxRerankRequests`, `maxEmbeddingChars`; statuses `completed`/`embedding_budget_limited`/`embedding_budget_exhausted`/`rerank_budget_exhausted`/`embedding_usage_unknown`; A's ledger is untouched; limited/exhausted falls back with explicit status; enabling rerank with zero rerank budget requires a positive value or keeps rerank off. **Request-budget validation rule:** `maxEmbeddingRequests`/`maxRerankRequests` accept 0 as "off" (embedding off → `lexical_only`; rerank off → no rerank POST); a negative, non-integer, NaN or Inf value is rejected as `invalid_budget` before any embedding/rerank request; `maxEmbeddingChars` must be a positive integer. **Cold-cache fake-transport mode matrix** (fake transport counts every embedding request and the role/`text_type` of each; cache empty; no real network). For `batchSize=8, topK=100, sweepCandidates=90`, assert the mode-specific slot budget, the sweep/lexical allocation and the exact request count in BOTH modes: `shared` R=0 → slotBudget 0, no request, `lexical_only`+`embedding_budget_exhausted`; R=1 → slotBudget 7, sweep 3 / lexical 4, `ceil((1+7)/8)=1` request; R=24 → slotBudget 191, sweep 90 / lexical 100, `ceil(191/8)=24` requests. `split` R=0 → slotBudget 0, no request, `lexical_only`; R=1 → slotBudget 0, **no query or document request** (no candidate capacity), `lexical_only`+`embedding_budget_exhausted`; R=24 → slotBudget 184, sweep 87 / lexical 97, `1+ceil(184/8)=24` requests; R=25 → slotBudget 192, sweep 90 / lexical 100, `1+ceil(190/8)=25` requests. In every row assert `requests <= maxEmbeddingRequests`, the sweep/lexical caps, and that the `split` adapter never mixes query and document texts in one request and reserves the query request separately. `maxEmbeddingRequests=-1` asserts `invalid_budget` before any request. `sweepCandidates=0` asserts `semantic_sweep_limited` with reason `sweep_disabled_by_config` and no zero-overlap claim. Character-bound zero-sweep case: `maxEmbeddingChars=1040`, question 40 chars, 500-rune passages gives `embeddingCharBudget=1000`, `sweepChars=473 < 500` and `lexicalChars=527 >= 500` — assert reason `sweep_zero_slots`, `sweepCoverage=0`, exactly one lexical passage embedded and zero sweep candidates. **High-budget cap case (shared):** `topK=100, sweepCandidates=90, batchSize=8, maxEmbeddingRequests=25` gives `embeddingSlotBudget=199`; assert `sweepSlots == 90` (the configured quota, **not** the uncapped `floor(199*90/190)=94`), `lexicalSlots == 100`, `sweepSlots + lexicalSlots == 190 <= 199`, and 9 spare slots; repeat with `maxEmbeddingRequests=100` (budget 799) and assert the sweep is still 90 and lexical still 100, so a larger request budget never exceeds the configured candidate counts. |
 | B-T34 | AC-FR-02-16 | PaddleOCR adapter: default local fake runtime (no cloud/token); explicit cloud fake job API submit/poll/done, JSONL parse, per-page markdown text; token redacted; page-count mismatch/timeout/failed state -> `pdf_extract_failed`; no fabricated text; no real network/token. |
 | B-T35 | AC-NFR-02-6 | Config persistence/reload: provider, base URL, masked key, model, dimensions, batch, weights, rerank settings and budgets survive a save/reload; no key in responses/logs; the evaluation report records the exact config. |
 | B-T36 | AC-FR-02-17 | Optional rerank: off -> zero rerank POST; Bailian/custom -> `relevance_score` combined with weights; rerank failure -> `rerank_unavailable` and fallback; rerank requests counted by B budget; scores are not compared across requests. |
@@ -694,10 +748,11 @@ them:
    the proportional shares must be reported with them. The evaluation must record and rerun any deviation.
 3. **Rerank:** off by default; Bailian/custom is optional; top-N, instruct,
    weight and budget are user-configurable; scores are request-relative.
-3b. **Semantic sweep bounds:** confirm `sweepCandidates=90` and the derived
-   proportional share rule and the 191-slot budget (24 requests x batch 8, minus
-   the question) with the reviewer, and confirm that the user-facing claim is `sweepCoverage` rather
-   than a guarantee. `semantic_sweep_limited` is the accepted status when
+3b. **Semantic sweep bounds:** confirm `sweepCandidates=90`, the proportional
+   share rule and the mode-specific slot budget (`shared` 24 requests x batch 8
+   minus the question = 191; `split` 25 requests, 1 reserved for the query, = 192)
+   with the reviewer, and confirm that the user-facing claim is `sweepCoverage`
+   rather than a guarantee. `semantic_sweep_limited` is the accepted status when
    `S < N`; a sampled miss must be reported as a coverage limitation, not as an
    embedder failure.
 4. **Vector persistence:** SQLite `passage_embeddings` cache versus process-local
@@ -712,10 +767,12 @@ them:
    migration.
 7. **Content revision:** v1 adopts `content_revision`/`content_hash`; confirm
    backfill and C/E consumption with C/E.
-8. **B budget:** defaults `maxEmbeddingRequests=24`, `maxEmbeddingChars=100000`,
-   `maxRerankRequests=0`, sweep 90 (191-candidate budget: 100 lexical + 90 sweep
-   + question); UI copy for `sweepCoverage`, `semantic_sweep_limited` and
-   limited-or-exhausted behavior. A's ledger stays untouched.
+8. **B budget:** defaults `maxEmbeddingChars=100000`, `maxRerankRequests=0`,
+   sweep 90, and a mode-specific `maxEmbeddingRequests` (24 `shared` / 25 `split`)
+   so the 100 lexical + 90 sweep quota is delivered in both batching modes; the
+   slot budget is derived from the mode (`shared` R*B-1, `split` (R-1)*B with the
+   query request reserved). UI copy for `sweepCoverage`, `semantic_sweep_limited`
+   and limited-or-exhausted behavior. A's ledger stays untouched.
 9. **Wire envelope:** namespaced `retrieval` object; C confirms
    `retrieval.passages[].passageId` and whether it adds top-level `citations`.
 10. **Evaluation set:** WANG Jiaqi prepares the documents, questions and gold

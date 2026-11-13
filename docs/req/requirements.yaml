@@ -284,11 +284,21 @@ requirements:
           report.
         test: B-T32
       - id: AC-FR-02-15
-        scenario: "The B retrieval budget is exhausted or embedding usage is unknown."
+        scenario: >-
+          The B retrieval budget is exhausted or embedding usage is unknown, in
+          either the shared-batch or the separate query/document batching mode.
         expected: >-
           B stops further embedding/rerank calls, reports the specific budget
           status, and falls back to lexical_only/embedding_only; A's completion
-          ledger is never read or mutated.
+          ledger is never read or mutated. The embedding candidate capacity is
+          derived from the actual batching mode: shared uses
+          maxEmbeddingRequests*batchSize-1 (the question shares a batch), split
+          reserves one request for the query and uses (maxEmbeddingRequests-1)
+          *batchSize for documents. The observed cold-cache request count is
+          ceil((1+C)/batchSize) in shared mode and 1+ceil(C/batchSize) in split
+          mode, never exceeds maxEmbeddingRequests, and a split-mode request never
+          mixes query and document texts. When the derived capacity is zero no
+          query or document request is made.
         test: B-T33
       - id: AC-FR-02-16
         scenario: "A PDF has no usable text layer; local OCR is the default and cloud OCR is opt-in."

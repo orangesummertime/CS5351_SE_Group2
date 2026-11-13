@@ -151,24 +151,39 @@ from A's completion budget:
   `embedding_usage_unknown`, `embedding_unavailable`;
 - no A ledger mutation; A's completion budget stays independent.
 
-Default B budget: `maxEmbeddingRequests=24`, `maxEmbeddingChars=100000`,
-`maxRerankRequests=0` (rerank off), `topK=100`, `sweepCandidates=90`, batch `8`,
-`lexicalWeight=0.35`, `embeddingWeight=0.65`, `rerankWeight=0`.
-The candidate budget is derived on two axes: `24 * 8 - 1` (question) = **191
-request slots**, and `maxEmbeddingChars` minus the question as the character
-budget. Both are split by the same ratio `sweepCandidates / (topK +
+Default B budget: `maxEmbeddingChars=100000`, `maxRerankRequests=0` (rerank off),
+`topK=100`, `sweepCandidates=90`, batch `8`, `lexicalWeight=0.35`,
+`embeddingWeight=0.65`, `rerankWeight=0`. `maxEmbeddingRequests` is mode-specific:
+**24 in `shared` mode, 25 in `split` mode**, so the 90 sweep + 100 lexical quota is
+delivered by default in both modes.
+
+**Batching mode by provider:** a local OpenAI-compatible server without
+`text_type` is `shared` (question and passages batch together); DashScope/Bailian
+with `text_type=query` for the question and `text_type=document` for passages is
+`split` (different request-level configs cannot share a batch, so one request is
+reserved for the query). A custom remote endpoint is `shared` unless it requires a
+per-role `text_type`, in which case it is `split`. The adapter reports this via
+`BatchingMode()` and `Embed` takes the role.
+
+The slot budget is derived from the mode: `shared` `max(0, R*B - 1)` (question
+shares a batch), `split` `max(0, (R-1)*B)` (query request reserved). With the
+defaults: `shared` R=24 → `24*8-1 = 191` slots; `split` R=25 → `(25-1)*8 = 192`
+slots. The character budget is `maxEmbeddingChars` minus the question,
+mode-independent. Both are split by the ratio `sweepCandidates / (topK +
 sweepCandidates)` = 90/190, then capped at the configured counts:
-`sweepSlots = min(sweepCandidates, floor(191 * 90/190)) = 90` and
-`lexicalSlots = min(topK, 191 - 90) = 100`, and the character budget splits about
-47,300 sweep / 52,600 lexical. Shares are nonnegative, capped at `sweepCandidates`
-and `topK`, and sum to at most the slot budget with any remainder left spare. A
-small configuration such as `maxEmbeddingRequests=1` yields 3 sweep / 4 lexical
-out of 7 rather than a negative share; a large one such as
-`maxEmbeddingRequests=25` (199 slots) still yields 90 sweep / 100 lexical with 9
-spare, never the uncapped 94 sweep. Character pressure shrinks both shares
-proportionally; it never takes the sweep's allowance, and if the sweep share
-cannot hold one passage the result reports `semantic_sweep_limited` with reason
-`sweep_zero_slots`.
+`sweepSlots = min(sweepCandidates, floor(slotBudget * 90/190))` and
+`lexicalSlots = min(topK, slotBudget - sweepSlots)`, giving 90 sweep / 100 lexical
+in both default modes; the character budget splits about 47,300 sweep / 52,600
+lexical. Shares are nonnegative, capped at `sweepCandidates` and `topK`, and sum
+to at most the slot budget with any remainder left spare. Cold-cache request count
+for C embedded candidates: `shared` `ceil((1+C)/B)`, `split` `1 + ceil(C/B)`. A
+small `shared` configuration such as R=1 yields 3 sweep / 4 lexical out of 7 in 1
+request; a small `split` configuration R=1 yields 0 candidate slots (no query or
+document request, `lexical_only`); a large `shared` R=25 (199 slots) still yields
+90 sweep / 100 lexical with 9 spare, never the uncapped 94 sweep. Character
+pressure shrinks both shares proportionally; it never takes the sweep's allowance,
+and if the sweep share cannot hold one passage the result reports
+`semantic_sweep_limited` with reason `sweep_zero_slots`.
 These are conservative defaults; the user can raise/lower them, and the
 evaluation report must record the actual values. If the candidate text exceeds
 `maxEmbeddingChars`, the selector deterministically reduces the effective

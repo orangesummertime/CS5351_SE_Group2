@@ -147,13 +147,25 @@ score is per content row, not per passage. See
 
 ## Hybrid scoring and model pinning
 
-- **Candidate budget (request slots):** `embeddingSlotBudget = max(0,
-  maxEmbeddingRequests * batchSize - 1)`, where the subtracted slot is the
-  question. A request-slot budget of 0 means no embedding happens at all.
+- **Batching mode.** The embedder reports `BatchingMode()`. `shared`: the question
+  and passages use the same request-level configuration (e.g. a local
+  OpenAI-compatible server without `text_type`) and can share a batch. `split`:
+  the question uses `text_type=query` and passages `text_type=document`
+  (DashScope/Bailian); these are different request-level configurations and cannot
+  share a batch, so one request is reserved for the query. `Embed` takes an
+  `EmbedRole` (`query`/`document`) and the caller never mixes roles in one request.
+- **Candidate budget (request slots), mode-specific:** with `R =
+  maxEmbeddingRequests`, `B = batchSize`,
+  `embeddingSlotBudget = shared ? max(0, R*B - 1) : max(0, (R-1)*B)`. In `shared`
+  the question occupies one slot of the shared batch; in `split` one whole request
+  is reserved for the query and the rest carry document batches. A slot budget of 0
+  means no candidate capacity, so no query or document request is made and the path
+  falls back to `lexical_only`. Cold-cache request count for `C` embedded
+  candidates: `shared` `ceil((1+C)/B)`, `split` `1 + ceil(C/B)`.
 - **Candidate budget (characters):** `embeddingCharBudget = max(0,
-  maxEmbeddingChars - questionChars)`. This is a real second limit: 191 is a
-  request-slot ceiling, and passage lengths can bind first at
-  `maxEmbeddingChars=100000`.
+  maxEmbeddingChars - questionChars)`, mode-independent. This is a real second
+  limit: the slot budget is a request-count ceiling, and passage lengths can bind
+  first at `maxEmbeddingChars=100000`.
 - **Proportional, nonnegative, capped shares.** The sweep share is a **ratio**,
   not a subtraction, because subtracting can go negative; and the result is
   **capped at the configured quota**, because a pure proportional split can
@@ -172,11 +184,12 @@ score is per content row, not per passage. See
   stay spare** (`embeddingSlotBudget - sweepSlots - lexicalSlots`); they are not
   redistributed into extra sweep or lexical candidates beyond the configured
   caps. The sweep's character allowance is an upper bound it may not fully use
-  once its count cap binds. This holds for every configuration: at
-  `maxEmbeddingRequests=1` the budget is 7 slots and the shares are 3 sweep / 4
+  once its count cap binds. This holds for every configuration: in `shared` mode
+  at `maxEmbeddingRequests=1` the budget is 7 slots and the shares are 3 sweep / 4
   lexical; at `maxEmbeddingRequests=25` the budget is 199 slots and the sweep is
   capped at 90 (not the uncapped `floor(199*90/190)=94`), lexical at 100, leaving
-  9 spare slots.
+  9 spare slots. In `split` mode the same limits give 0 and 192 slots respectively
+  (one request reserved for the query).
 - **Both limits protect the sweep.** Each side selects up to its own slot count
   and stops when its own character allowance is used. Character pressure
   therefore shrinks both sides proportionally instead of consuming the sweep
@@ -187,12 +200,17 @@ score is per content row, not per passage. See
   `sweep_zero_slots` reason and must not claim zero-overlap recall at all. A
   configured `sweepCandidates=0` is a deliberate opt-out and is labelled as such,
   not silently merged into the same status as a budget-starved run.
-- **With the defaults** (`maxEmbeddingRequests=24`, `batchSize=8`, `topK=100`,
-  `sweepCandidates=90`, `maxEmbeddingChars=100000`): slot budget 191,
-  `sweepRatio = 90/190`, `sweepSlots = 90`, `lexicalSlots = 101` capped to 100, so
-  190 of 191 slots are used and one slot is spare; the character split is about
-  47,300 sweep and 52,600 lexical, which holds 90 passages of roughly 500 runes.
-  A document longer than 90 sampled segments reports `semantic_sweep_limited`.
+- **With the defaults** (`batchSize=8`, `topK=100`, `sweepCandidates=90`,
+  `maxEmbeddingChars=100000`, `sweepRatio = 90/190`), the request limit is
+  mode-specific so the 90 sweep + 100 lexical quota is delivered in both modes:
+  `shared` `maxEmbeddingRequests=24` → slot budget 191, sweep 90 / lexical 100
+  (190 used, 1 spare), cold-cache requests `ceil(191/8)=24`; `split`
+  `maxEmbeddingRequests=25` → slot budget 192, sweep 90 / lexical 100 (190 used,
+  2 spare), requests `1+ceil(190/8)=25`. A user-lowered `split` limit of 24 gives
+  slot budget 184 and sweep 87 / lexical 97, reported rather than promised at
+  90/100. The character split is about 47,300 sweep and 52,600 lexical, which holds
+  90 passages of roughly 500 runes. A document longer than the sampled sweep
+  reports `semantic_sweep_limited`.
 - The sweep is a deterministic position-stratified sample, not a random one, so
   a frozen-vector replay stays byte-identical.
 - **What the claim is:** recall for a zero-overlap paraphrase is bounded by

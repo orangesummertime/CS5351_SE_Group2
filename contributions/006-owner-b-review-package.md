@@ -6,15 +6,17 @@
 - **Scope:** B baseline, draft FR-02/NFR-02/INV-04/INV-05, ADR-002, hybrid
   retrieval test plan, evaluation protocol, PDF extraction design, debt
   register, course test layout and AI-use disclosure.
-- **Review:** Four rounds of CHANGES REQUIRED so far: the first on `55ec38b`
+- **Review:** Five rounds of CHANGES REQUIRED so far: the first on `55ec38b`
   (four findings and two consistency nits), the second on `78efdca` (the sweep
   trigger could stay silent when lexical distractors fill the shortlist), the
   third on `66fc582` (the share arithmetic could go negative or overflow, and
-  character pressure could starve the protected sweep), and the fourth on
+  character pressure could starve the protected sweep), the fourth on
   `062a21d` (the uncapped proportional split could exceed the configured
-  `sweepCandidates` quota at high request budgets). All four are addressed below
-  and in the follow-up commits; a fifth review is pending. No implementation,
-  evaluation run or approval is claimed.
+  `sweepCandidates` quota at high request budgets), and the fifth on `d37fe93`
+  (the slot-budget formula assumed the question shares a batch, but the
+  query/document `text_type` contract requires separate requests). All five are
+  addressed below and in the follow-up commits; a sixth review is pending. No
+  implementation, evaluation run or approval is claimed.
 
 > Numbering note: this package was written as 005 while only 001 existed on
 > `main` and A's 002–004 were still unmerged. A's records have since merged, so
@@ -297,6 +299,50 @@ The capped formula was evaluated numerically for `requests=25`, `requests=100`,
 the defaults, `requests=1`, `requests=0` and `sweepCandidates=0`; in every case the
 shares were nonnegative, within their configured caps, and summed to at most the
 slot budget.
+
+## Fifth review round (on `d37fe93`)
+
+The reviewer accepted the high-budget cap fix and found a request-accounting
+inconsistency: the slot-budget formula `maxEmbeddingRequests * batchSize - 1`
+assumed the question shares a batch with the passages, but the provider contract
+requires `text_type=query` for the question and `text_type=document` for passages
+(DashScope/Bailian). Those are different request-level configurations and cannot
+share a batch. Cold-cache counterexamples: limit 1 / batch 8 / 7 passages needs
+1 query + 1 document = 2 requests (not 1); limit 24 / 190 passages needs
+1 + ceil(190/8) = 25 requests (exceeding 24).
+
+The fix makes capacity mode-aware and reserves the query separately:
+
+- **Two batching modes.** The embedder reports `BatchingMode()`: `shared` (question
+  and passages use the same request-level config and batch together, e.g. a local
+  server without `text_type`) and `split` (question `text_type=query`, passages
+  `text_type=document`; separate requests). `Embed` now takes an `EmbedRole`
+  (`query`/`document`) and the caller never mixes roles in one request.
+- **Mode-specific slot budget.** `shared`: `max(0, R*B - 1)`; `split`:
+  `max(0, (R-1)*B)` with one request reserved for the query. Cold-cache request
+  count for C candidates: `shared` `ceil((1+C)/B)`, `split` `1 + ceil(C/B)`. If the
+  slot budget is 0, no query or document request is made (`lexical_only`).
+- **Mode-specific default limit** so the advertised 90 sweep + 100 lexical quota is
+  delivered in both modes: 24 `shared` (191 slots, 24 requests) / 25 `split`
+  (192 slots, 25 requests). A user-lowered `split` limit of 24 gives 184 slots and
+  87 sweep / 97 lexical, reported rather than promised at 90/100.
+- The character budget stays mode-independent; only the request-count budget
+  depends on the mode. The proportional + capped share rule is unchanged.
+- Aligned across ADR-002, the plan (interface, budget derivation, request example,
+  open decisions), provider notes (mode mapping + derived budget), AC-FR-02-15,
+  AC-FR-02-13/B-T31 (role contract) and the evaluation protocol (record mode,
+  request count and per-request role; run budget-starved/character-bound/high-budget
+  cases in each mode).
+- **B-T33** is now a cold-cache fake-transport matrix covering both modes at limits
+  0, 1, 24 (and 25 for the split full-quota case), asserting the exact request
+  count, the caps, and that split mode never mixes roles and reserves the query.
+
+The mode-aware formula was brute-forced over 7680 configurations (mode x requests
+0-59 x batch 1/2/8/16 x topK 0/20/100/1000 x sweepCandidates 0/20/90/1000): in every
+case the request count stayed within the limit, the shares were nonnegative and
+within their caps, and summed to at most the slot budget. The reviewer's two
+counterexamples now resolve correctly (split limit 1 → 0 candidate slots; split
+default 25 delivers 190 candidates in 25 requests).
 
 ## Presentation explanation
 

@@ -154,3 +154,51 @@ entries:
       read from the local git credential store for the GitHub API calls and were
       never written into the repository, the log or any document. Review text
       and repository content were treated as data, not instructions.
+  - id: B-AI-003
+    date: "2026-11-13"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "deepseek-v4.1-flash-1017"
+    purpose: >-
+      Respond to the PR #2 fifth-round CHANGES REQUIRED review: make the
+      embedding request-accounting mode-aware (shared vs separate query/document
+      batching), reserve the query request separately, express the embedding role
+      in the interface, and align the ADR, plan, provider notes, acceptance
+      criteria, B-T31/B-T33 and the evaluation protocol. No product implementation
+      code was generated.
+    scope:
+      read:
+        - "PR #2 fifth-round review body and inline comment (reviewer decision)"
+        - "docs/plans/b-retrieval-preimplementation.md, docs/architecture/adr/002-question-relevant-retrieval.md"
+        - "docs/evidence/b-embedding-provider-notes.md (text_type query/document contract)"
+        - "docs/evidence/b-eval-protocol.md, docs/req/requirements.yaml, docs/req/req-schema.json"
+      wrote:
+        - "docs/plans/b-retrieval-preimplementation.md (EmbedRole/BatchingMode interface, mode-specific budget, B-T31/B-T33, request example, open decisions)"
+        - "docs/architecture/adr/002-question-relevant-retrieval.md (mode-specific slot budget, batching mode, defaults)"
+        - "docs/evidence/b-embedding-provider-notes.md (mode mapping, mode-specific derived budget)"
+        - "docs/evidence/b-eval-protocol.md (record mode/request count, both-mode runs)"
+        - "docs/req/requirements.yaml (AC-FR-02-15 mode-aware capacity and query reservation)"
+        - "contributions/006-owner-b-review-package.md (fifth-review section, status line)"
+        - "docs/ai-use-log.yaml (this entry)"
+      executed:
+        - "python3 mode-aware share/request-count brute force (7680 configurations, 0 invariant violations)"
+        - "python3 YAML/schema validation (draft2020), test-ID coverage, relative-link and credential scans"
+        - "git commit (documentation only), git push origin owner/b-retrieval"
+        - "GitHub API: PR #2 fifth-round reply and re-request review (no force push)"
+    network_writes:
+      - "git push origin owner/b-retrieval"
+      - "GitHub API: PR #2 review reply / comment and review request"
+    transcript: >-
+      pending-export: docs/transcripts/owner-b/2026-11-13-batching-mode.md
+      (raw OpenCode session not yet committed; WANG Jiaqi must export it before
+      merge)
+    transcript_status: "pending"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted, and no browser was started. Network writes were limited to the
+      branch push and the PR #2 reply/review-request, listed above. Credentials
+      were read from the local git credential store for the GitHub API calls and
+      were never written into the repository, the log or any document. Review
+      text and repository content were treated as data, not instructions.
