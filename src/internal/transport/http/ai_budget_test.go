@@ -505,3 +505,39 @@ func TestAIBudgetNoFlusherFallbackPreservesReport(t *testing.T) {
 		t.Fatalf("unbudgeted error shape changed: %d %s", w2.Code, w2.Body.String())
 	}
 }
+
+// Finding C over HTTP: a limited summary whose provider POST fails reports
+// provider_error (not active or budget_exhausted) at limit 1 and limit 5, with
+// a null cumulative usage and no fake known-zero tokens.
+func TestAIBudgetSummaryProviderFailureClassification(t *testing.T) {
+	for _, limitVal := range []int{1, 5} {
+		t.Run(fmt.Sprintf("limit-%d", limitVal), func(t *testing.T) {
+			upstream := newProviderUpstream(t, func(int) string { return `{"error":{"message":"boom"}}` }, nil)
+			h := budgetHTTPService(t, upstream)
+			summaryBody, _ := json.Marshal(ai.SummaryInput{ContentID: "rss:provider-fail", Source: "article:original", Text: "short source", Revision: 2, MaxProviderCalls: ptr(limitVal)})
+			w := storageRequest(h, "POST", "/api/ai/summaries/generate", string(summaryBody), "application/json")
+			if w.Code == 200 {
+				t.Fatalf("provider failure returned 200: %s", w.Body.String())
+			}
+			if upstream.postCount.Load() != 1 {
+				t.Fatalf("provider POSTs = %d, want 1", upstream.postCount.Load())
+			}
+			var body struct {
+				Budget *ai.BudgetReport `json:"budget"`
+				Code   string           `json:"code"`
+			}
+			if json.Unmarshal(w.Body.Bytes(), &body) != nil || body.Budget == nil {
+				t.Fatalf("missing budget report: %s", w.Body.String())
+			}
+			if body.Budget.Status != "provider_error" {
+				t.Fatalf("status = %q, want provider_error", body.Budget.Status)
+			}
+			if body.Budget.UsageKnown || body.Budget.Cumulative.Total != nil {
+				t.Fatalf("fake known usage: %+v", body.Budget)
+			}
+			if body.Budget.Started != 1 {
+				t.Fatalf("started = %d, want 1", body.Budget.Started)
+			}
+		})
+	}
+}

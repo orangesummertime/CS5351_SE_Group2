@@ -676,3 +676,118 @@ func TestAT17TimeoutConsumesSlotNoRetry(t *testing.T) {
 		t.Fatalf("timeout did not consume a slot: %+v", snapshot)
 	}
 }
+
+// Finding A (A-T18): a limited chat stream that emits content plus a valid
+// usage block but ends with a premature EOF (no [DONE]) is truncated, not
+// completed. It must report a non-empty-stream error, never be seen as success,
+// preserve the forwarded content and leave the one started slot consumed.
+func TestAT18ChatStreamContentUsageEOFIsTruncated(t *testing.T) {
+	var streams atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		streams.Add(1)
+		io.WriteString(w, "data: {\"choices\":[{\"delta\":{\"content\":\"部分\"}}]}\n\n"+
+			"data: {\"choices\":[{\"delta\":{\"content\":\"回答\"}}]}\n\n"+
+			"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":6,\"total_tokens\":10}}\n\n")
+	}))
+	defer server.Close()
+	ctx := budgetContext(t, 3)
+	var got strings.Builder
+	err := New().ChatStream(ctx, ai.Config{BaseURL: server.URL, Model: "fixture"}, "ctx", []ai.ChatMessage{{Role: "user", Content: "hi"}}, func(s string) error { got.WriteString(s); return nil })
+	if !errors.Is(err, ai.ErrTruncated) || !errors.Is(err, ai.ErrFormat) {
+		t.Fatalf("content+usage+EOF must be truncated, got %v", err)
+	}
+	if errors.Is(err, ai.ErrEmptyCompletion) {
+		t.Fatalf("non-empty truncated stream reported as empty: %v", err)
+	}
+	if got.String() != "部分回答" {
+		t.Fatalf("partial content lost: %q", got.String())
+	}
+	snapshot := ai.BudgetStatus(ctx)
+	if snapshot.Started != 1 {
+		t.Fatalf("started=%d, want 1", snapshot.Started)
+	}
+	if streams.Load() != 1 {
+		t.Fatalf("stream POSTs = %d, want exactly 1", streams.Load())
+	}
+}
+
+// Finding A (A-T18): the same premature-EOF truncation applies to the Responses
+// SSE protocol when content is delivered without response.completed.
+func TestAT18ResponsesStreamContentUsageEOFIsTruncated(t *testing.T) {
+	var got strings.Builder
+	input := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"hi\"}\n\n" +
+		"data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":1,\"output_tokens\":2,\"total_tokens\":3}}}\n\n"
+	// Drop the completion event to simulate truncation after the delta.
+	truncated := "data: {\"type\":\"response.output_text.delta\",\"delta\":\"hi\"}\n\n"
+	_ = input
+	if _, err := parseResponsesStream(strings.NewReader(truncated), func(v string) error { _, e := got.WriteString(v); return e }, true); !errors.Is(err, ai.ErrTruncated) {
+		t.Fatalf("responses content+EOF must be truncated, got %v", err)
+	}
+	if got.String() != "hi" {
+		t.Fatalf("partial content lost: %q", got.String())
+	}
+	if _, err := parseResponsesStream(strings.NewReader(input), func(string) error { return nil }, true); err != nil {
+		t.Fatalf("completed responses stream rejected: %v", err)
+	}
+}
+
+// Finding A: an unbudgeted invocation keeps upstream compatibility. A stream
+// with content but no [DONE] is still accepted because strict completion is a
+// limited-invocation rule.
+func TestStreamEOFUnbudgetedCompatibility(t *testing.T) {
+	input := "data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}\n\n"
+	if _, err := parseStream(strings.NewReader(input), func(string) error { return nil }, false); err != nil {
+		t.Fatalf("unbudgeted EOF rejected: %v", err)
+	}
+	if _, err := parseStream(strings.NewReader(input), func(string) error { return nil }, true); !errors.Is(err, ai.ErrTruncated) {
+		t.Fatalf("limited EOF accepted: %v", err)
+	}
+}
+
+// Finding B: a genuine usage-only chunk with an empty choices array is valid
+// and must reconcile a known total even though it carries no content.
+func TestStreamChoicesEmptyUsageOnlyChunkIsAccepted(t *testing.T) {
+	input := "data: {\"choices\":[{\"delta\":{\"content\":\"你好\"}}]}\n\n" +
+		"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":6,\"total_tokens\":10}}\n\n" +
+		"data: [DONE]\n\n"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, input)
+	}))
+	defer server.Close()
+	ctx := budgetContext(t, 2)
+	var got strings.Builder
+	err := New().ChatStream(ctx, ai.Config{BaseURL: server.URL, Model: "fixture"}, "ctx", []ai.ChatMessage{{Role: "user", Content: "hi"}}, func(s string) error { got.WriteString(s); return nil })
+	if err != nil || got.String() != "你好" {
+		t.Fatalf("usage-only chunk stream = %q err=%v", got.String(), err)
+	}
+	snapshot := ai.BudgetStatus(ctx)
+	if snapshot.Cumulative != (ai.Usage{Prompt: 4, Output: 6, Total: 10}) || !snapshot.UsageKnown {
+		t.Fatalf("usage-only chunk not reconciled: %+v", snapshot)
+	}
+}
+
+// Finding B: malformed usage inside a usage-only chunk is still usage_unknown
+// and blocks further starts; multiple choices remain a format error.
+func TestStreamChoicesEmptyMalformedUsageIsUnknown(t *testing.T) {
+	input := "data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}\n\n" +
+		"data: {\"choices\":[],\"usage\":{\"prompt_tokens\":4,\"completion_tokens\":6}}\n\n" +
+		"data: [DONE]\n\n"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, input)
+	}))
+	defer server.Close()
+	ctx := budgetContext(t, 2)
+	if err := New().ChatStream(ctx, ai.Config{BaseURL: server.URL, Model: "fixture"}, "ctx", []ai.ChatMessage{{Role: "user", Content: "hi"}}, func(string) error { return nil }); !errors.Is(err, ai.ErrUsageUnknown) {
+		t.Fatalf("partial usage-only usage must be unknown: %v", err)
+	}
+	if snapshot := ai.BudgetStatus(ctx); !snapshot.UsageUnknown || snapshot.UsageKnown {
+		t.Fatalf("snapshot = %+v", snapshot)
+	}
+	if err := New().ChatStream(ctx, ai.Config{BaseURL: server.URL, Model: "fixture"}, "ctx", []ai.ChatMessage{{Role: "user", Content: "hi"}}, func(string) error { return nil }); !errors.Is(err, ai.ErrUsageUnknown) {
+		t.Fatalf("start after unknown not blocked: %v", err)
+	}
+	multi := "data: {\"choices\":[{\"delta\":{\"content\":\"a\"}},{\"delta\":{\"content\":\"b\"}}]}\n\ndata: [DONE]\n\n"
+	if _, err := parseStream(strings.NewReader(multi), func(string) error { return nil }, true); !errors.Is(err, ai.ErrFormat) || errors.Is(err, ai.ErrTruncated) {
+		t.Fatalf("multiple choices must stay a format error: %v", err)
+	}
+}

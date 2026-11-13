@@ -16,7 +16,7 @@
         {
           "complete": true,
           "completedCalls": 3,
-          "elapsedMs": 5,
+          "elapsedMs": 6,
           "error": "",
           "inputHash": "749b0c7205f3c779",
           "kind": "summary",
@@ -30,7 +30,7 @@
         },
         {
           "complete": true,
-          "elapsedMs": 2,
+          "elapsedMs": 3,
           "error": "",
           "inputHash": "eb11ca80760d40ce",
           "kind": "translation",
@@ -53,7 +53,7 @@
           "budgetUsageKnown": true,
           "complete": false,
           "completedCalls": 1,
-          "elapsedMs": 2,
+          "elapsedMs": 3,
           "error": "AI provider call budget exhausted",
           "inputHash": "749b0c7205f3c779",
           "kind": "summary",
@@ -74,7 +74,7 @@
           "budgetStarted": 1,
           "budgetUsageKnown": true,
           "complete": false,
-          "elapsedMs": 2,
+          "elapsedMs": 3,
           "error": "AI provider call budget exhausted",
           "inputHash": "eb11ca80760d40ce",
           "kind": "translation",
@@ -118,7 +118,7 @@
           "budgetStarted": 2,
           "budgetUsageKnown": true,
           "complete": true,
-          "elapsedMs": 3,
+          "elapsedMs": 2,
           "error": "",
           "inputHash": "eb11ca80760d40ce",
           "kind": "translation",
@@ -229,5 +229,6 @@
       ]
     }
   ],
-  "baselineVerification": "Tracked internal/ai and internal/adapters/aichat files match the pinned upstream commit (read-only diff empty)."
+  "baselineVerification": "Tracked internal/ai and internal/adapters/aichat files match the pinned upstream commit (read-only diff empty).",
+  "followupValidation": "Current workflow replayed after PR6 stream-completion and summary-failure fixes; original unbounded control unchanged."
 }

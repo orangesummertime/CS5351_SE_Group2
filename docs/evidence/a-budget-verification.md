@@ -52,4 +52,6 @@ Final run on 2026-11-13: 62 frontend files / 251 tests and production build pass
 
 ## Review and integration limits
 
+PR #6 follow-up corrected three concrete cases: limited streams ending before a provider completion marker, valid `choices: []` usage-only chunks, and summary-error snapshots taken before outcome classification. Additional adapter, service and HTTP regression cases passed with focused/race checks, vet and the otherwise-full Go regression. The six current fixed-workflow measurements were replayed successfully. See [contribution 012](../../contributions/012-owner-a-stream-review-fixes.md). Frontend code was unchanged by this follow-up.
+
 Group confirmation authorized implementation under the existing A plan. This implementation still needs non-author review before merge. B/C/D's future completion paths must adopt the same ledger boundary; this PR cannot certify modules that do not exist yet. No new database migration, global account cap, hard token cap or monetary cap is introduced.

@@ -760,3 +760,52 @@ func TestAT22CheckSummaryCountsOneSyntheticOperation(t *testing.T) {
 		t.Fatalf("invalid check made a POST: summary=%d translation=%d", summarizer.posts, translator.posts)
 	}
 }
+
+// Finding C: a provider failure during summary generation is classified as
+// provider_error under both limit 1 and limit 5. The outcome must not be
+// derived from remaining slots (active under 5, budget_exhausted under 1), and
+// the partial state plus null usage are preserved with no fake known-zero
+// token count. Cancellation is reported as cancelled.
+func TestSummaryProviderFailureClassificationBeforeBudgetSnapshot(t *testing.T) {
+	cases := []struct {
+		name    string
+		limit   int
+		callErr error
+		outcome Outcome
+		status  string
+	}{
+		{"provider-limit1", 1, ErrProvider, OutcomeProviderError, "provider_error"},
+		{"provider-limit5", 5, ErrProvider, OutcomeProviderError, "provider_error"},
+		{"cancel-limit1", 1, context.Canceled, OutcomeCancelled, "cancelled"},
+		{"timeout-limit5", 5, context.DeadlineExceeded, OutcomeCancelled, "cancelled"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			summarizer := &budgetSummarizer{usage: Usage{1, 1, 2}, failWith: tc.callErr}
+			translator := &budgetTranslator{usage: Usage{1, 1, 2}}
+			s, rev := newBudgetService(t, translator, summarizer)
+			// MaxProviderCalls alone makes the service attach the invocation
+			// ledger; the returned report and our verification share it.
+			in := SummaryInput{ContentID: "rss:provider-fail", Source: "article:original", Revision: rev, MaxProviderCalls: limit(tc.limit), Segments: []SummarySegment{{Index: 0, Text: "short source"}}}
+			result, genErr := s.SummaryGenerate(context.Background(), in)
+			if !errors.Is(genErr, tc.callErr) {
+				t.Fatalf("error = %v, want %v", genErr, tc.callErr)
+			}
+			if result.Budget == nil {
+				t.Fatal("provider failure returned no budget report")
+			}
+			if result.Budget.Status != tc.status {
+				t.Fatalf("status = %q, want %q", result.Budget.Status, tc.status)
+			}
+			if result.Budget.UsageKnown || result.Budget.Cumulative.Total != nil {
+				t.Fatalf("fake known usage on provider failure: %+v", result.Budget)
+			}
+			if result.Budget.Started != 1 {
+				t.Fatalf("started = %d, want 1", result.Budget.Started)
+			}
+			if result.Complete {
+				t.Fatal("failed summary reported complete")
+			}
+		})
+	}
+}

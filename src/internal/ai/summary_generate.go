@@ -133,6 +133,9 @@ func (s *Service) SummaryGenerate(parent context.Context, in SummaryInput) (resu
 	s.cancel = cancel
 	s.wait.Add(1)
 	s.mu.Unlock()
+	sectionCount := summarySectionCount(segments, in.Source, groups)
+	fresh := summaryCache{Result: SummaryResult{Key: key, ContentID: in.ContentID, Source: in.Source, BaseURL: c.BaseURL, Model: c.Model, TotalCalls: totalCalls, FormatVersion: summaryFormatVersion, Progress: SummaryProgress{TotalCalls: totalCalls, TotalSections: sectionCount}}, Current: []SummaryDraft{}}
+	cache := fresh
 	defer func() {
 		cancel()
 		s.mu.Lock()
@@ -141,18 +144,15 @@ func (s *Service) SummaryGenerate(parent context.Context, in SummaryInput) (resu
 		s.mu.Unlock()
 		s.wait.Done()
 		if retErr != nil {
+			// Classify the terminal outcome BEFORE snapshotting the returned
+			// budget in the same LIFO frame. A provider failure under any limit
+			// must report provider_error, not active or budget_exhausted, and
+			// never a fake known-zero token count. The partial checkpoint stays.
 			SetOutcome(ctx, terminalOutcome(retErr))
-		}
-	}()
-	sectionCount := summarySectionCount(segments, in.Source, groups)
-	fresh := summaryCache{Result: SummaryResult{Key: key, ContentID: in.ContentID, Source: in.Source, BaseURL: c.BaseURL, Model: c.Model, TotalCalls: totalCalls, FormatVersion: summaryFormatVersion, Progress: SummaryProgress{TotalCalls: totalCalls, TotalSections: sectionCount}}, Current: []SummaryDraft{}}
-	cache := fresh
-	defer func() {
-		if BudgetAttached(ctx) && retErr != nil {
-			// Preserve the partial checkpoint result and budget counters on
-			// error so the HTTP layer can render progress without the ledger.
-			result = cache.Result
-			result.Budget = budgetReportFor(ctx)
+			if BudgetAttached(ctx) {
+				result = cache.Result
+				result.Budget = budgetReportFor(ctx)
+			}
 		}
 	}()
 	if in.Regenerate {

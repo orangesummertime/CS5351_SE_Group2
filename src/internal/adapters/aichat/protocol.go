@@ -166,7 +166,7 @@ func (c *Client) ChatStream(ctx context.Context, config ai.Config, source string
 		}
 		return ai.ErrProvider
 	}
-	usage, err := parseStream(response.Body, emit)
+	usage, err := parseStream(response.Body, emit, ai.BudgetAttached(ctx))
 	if err != nil {
 		return err
 	}
@@ -220,7 +220,7 @@ func (c *Client) doResponsesStream(ctx context.Context, config ai.Config, chat [
 	if response.StatusCode != http.StatusOK {
 		return ai.ErrProvider
 	}
-	usage, err := parseResponsesStream(response.Body, emit)
+	usage, err := parseResponsesStream(response.Body, emit, ai.BudgetAttached(ctx))
 	if err != nil {
 		return err
 	}
@@ -230,7 +230,11 @@ func (c *Client) doResponsesStream(ctx context.Context, config ai.Config, chat [
 // parseResponsesStream consumes Responses SSE events and returns whatever usage
 // block was observed. A completed stream without a usage block yields nil so
 // the caller reports usage_unknown instead of a known zero.
-func parseResponsesStream(body io.Reader, emit func(string) error) (*rawUsage, error) {
+//
+// requireDone enables strict completion for limited invocations: content must
+// be followed by an explicit response.completed (or [DONE]). A generic EOF that
+// delivers partial content is an ambiguous truncation and never success.
+func parseResponsesStream(body io.Reader, emit func(string) error, requireDone bool) (*rawUsage, error) {
 	reader := bufio.NewScanner(io.LimitReader(body, (256<<10)+1))
 	reader.Buffer(make([]byte, 4096), 64<<10)
 	emitted, done := false, false
@@ -283,6 +287,11 @@ func parseResponsesStream(body io.Reader, emit func(string) error) (*rawUsage, e
 			return nil, ai.ErrEmptyCompletion
 		}
 		return nil, ai.ErrFormat
+	}
+	if requireDone && !done {
+		// Content arrived but the provider never emitted response.completed;
+		// the stream was truncated after partial output. Never success.
+		return nil, ai.ErrTruncated
 	}
 	return usage, nil
 }
@@ -358,7 +367,15 @@ func (c *Client) doCompleteResponses(ctx context.Context, config ai.Config, payl
 // parseStream is deliberately small and line-oriented: OpenAI-compatible
 // servers send one JSON object per data line and terminate with [DONE]. It
 // returns the last observed usage block; absent usage yields nil.
-func parseStream(body io.Reader, emit func(string) error) (*rawUsage, error) {
+//
+// A chunk with an empty choices array is a legitimate usage-only envelope (sent
+// after the last content delta when streaming usage is requested); it updates
+// usage without content. Malformed chunks and multiple choices stay rejected.
+//
+// requireDone enables strict completion for limited invocations: content must
+// be followed by an explicit [DONE]. A generic EOF after content is ambiguous
+// truncation, never success, and must not hide a non-stream fallback.
+func parseStream(body io.Reader, emit func(string) error, requireDone bool) (*rawUsage, error) {
 	reader := bufio.NewScanner(io.LimitReader(body, (256<<10)+1))
 	reader.Buffer(make([]byte, 4096), 64<<10)
 	emitted, done := false, false
@@ -384,11 +401,16 @@ func parseStream(body io.Reader, emit func(string) error) (*rawUsage, error) {
 			} `json:"choices"`
 			Usage json.RawMessage `json:"usage"`
 		}
-		if json.Unmarshal([]byte(line), &event) != nil || len(event.Choices) != 1 {
+		if json.Unmarshal([]byte(line), &event) != nil || len(event.Choices) > 1 {
 			return nil, ai.ErrFormat
 		}
 		if len(event.Usage) > 0 && string(event.Usage) != "null" {
 			usage = parseRawUsage(event.Usage)
+		}
+		if len(event.Choices) == 0 {
+			// Usage-only envelope: no content to emit. Without usage it carries
+			// no information and is only a harmless keep-alive-shaped chunk.
+			continue
 		}
 		if value := event.Choices[0].Delta.Content; value != "" {
 			emitted = true
@@ -408,6 +430,11 @@ func parseStream(body io.Reader, emit func(string) error) (*rawUsage, error) {
 			return nil, ai.ErrEmptyCompletion
 		}
 		return nil, ai.ErrFormat
+	}
+	if requireDone && !done {
+		// Content arrived but the provider closed the stream without [DONE];
+		// the response was truncated after partial output. Never success.
+		return nil, ai.ErrTruncated
 	}
 	return usage, nil
 }

@@ -38,3 +38,18 @@ entries:
     evidence: docs/evidence/a-budget-comparison.json
     network_activity: CityU model inference and local-loopback deterministic HTTP tests; upstream source was measured read-only through Go overlay.
     review: Implementation prepared for independent review; no final acceptance or merge approval is claimed.
+  - id: AI-A-004
+    owner: Kefan CHEN
+    date: 2026-11-13
+    tool: OpenCode
+    model: CityU gateway DeepSeek V4 Flash
+    purpose: >-
+      Correct three PR6 technical findings: limited provider-stream completion,
+      usage-only chunks, and summary failure snapshot order; add regression cases.
+    original_session_id: ses_e2c9c9c08ffegoFpLrqLFNBXNP
+    original_export: owner-local artifacts/a-budget-implementation-session-3.json
+    original_export_sha256: 8a8211acffe9f9d6a7b8cef9598f5aa55584210ad784289ae690c02db4261273
+    transcript_status: retained_complete_original_export
+    verification: Focused and race Go tests, vet and otherwise-full uncached Go regression passed with only the existing FFmpeg exact-duration test excluded; current scripted workflow comparison replayed successfully. Frontend unchanged; prior 251-test/build result retained.
+    network_activity: CityU model inference and local-loopback deterministic HTTP tests; no live application-provider evaluation or browser.
+    review: Technical follow-up only; final independent implementation approval remains pending.
