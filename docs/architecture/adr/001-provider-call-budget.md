@@ -1,6 +1,6 @@
 # ADR-001 · Per-invocation provider-call budget
 
-- **Status:** revised after CHANGES REQUIRED; independent re-review pending.
+- **Status:** design approved in PR #1; live evidence in PR #4 awaits independent review before implementation.
 - **Owner:** Kefan CHEN.
 - **Related:** [FR-01, NFR-01 and INV-01](../../req/requirements.yaml), [plan and tests](../../plans/a-budget-preimplementation.md), [debt](../../debt-register.md).
 
@@ -12,7 +12,7 @@ Attach a concurrency-safe per-invocation ledger to context. `internal/ai` owns l
 
 Valid usage has nonnegative integer prompt/output/total counts with total = prompt + output. Record per-call and cumulative values. Missing, partial, malformed or inconsistent usage after a successful completion becomes `usage_unknown`; no later completion starts in that invocation. The cap and usage status are exposed through service, HTTP/SSE and UI. A blocked operation is not success; partial checkpoints stay partial. No SQLite usage ledger in v1.
 
-Streaming chat keeps the upstream request format for this proposal. The current stream request does not ask for usage, so a returned answer without valid usage is shown as `usage_unknown`, with explicit UI copy and no known-zero token count or further POST in the same invocation. The separate streaming measurement arm will show whether each provider returns usable data; this behavior must be reviewed again if the results undermine practical chat availability.
+Streaming chat keeps the upstream request format for this proposal. The current stream request does not ask for usage, so a returned answer without valid usage is shown as `usage_unknown`, with explicit UI copy and no known-zero token count or further POST in the same invocation. The [live streaming arm](../../evidence/a-live-usage-presence.md) found no usage in three CityU samples and valid usage in three Mistral samples. The evidence requires independent review before implementation.
 
 ## Error classification for budgeted invocations
 
@@ -51,4 +51,4 @@ Reopen this ADR before implementation if live measurement shows valid usage belo
 
 ## Review gate
 
-PR #1 received an initial CHANGES REQUIRED review, followed by approval of the documentation-only revision at `05b8feb`. The approval did not authorize implementation. This updated revision requires a new independent review; live evidence and the implementation gate remain pending.
+PR #1 received an initial CHANGES REQUIRED review, followed by independent approval of the final documentation-only revision and merge. That approval did not authorize implementation. PR #4 presents the live evidence for independent review; the implementation gate remains pending.
