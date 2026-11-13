@@ -23,7 +23,9 @@
   the seventh-round section below. The eighth review, a COMMENTED re-review of
   `077e93b`, confirmed the retention/export step addressed and requested no
   further source change; its outcome is recorded in the eighth-round section
-  below.
+  below. The ninth review, an APPROVED re-review of `33016ce`, approved the
+  package on technical grounds and requested the pre-merge reconciliation with
+  main recorded in the ninth-round section below.
   Independent human approval of the resulting head is still pending. No
   implementation, evaluation run or approval is claimed.
 
@@ -461,6 +463,59 @@ This session is recorded as B-AI-006, with its own export captured at session
 end. **Independent human review of the resulting head is still required**
 before merge; this documentation round does not claim it, and no
 implementation, evaluation run or approval is claimed.
+
+## Ninth review round (on `33016ce`)
+
+The reviewer re-reviewed the export-confirmation head and **approved it on
+technical grounds**: the earlier design, request-accounting, reconciliation and
+declared session-retention findings are addressed, and the latest revision
+changed no product code or design. No further design or source change was
+requested. The one remaining pre-merge item was a merge conflict with main:
+reconcile the shared files while preserving both owners' entries. The review
+also repeated its two coverage limits (owner-local exports not opened, reported
+regression suite not independently rerun); both are addressed below without
+altering any export.
+
+- **Main reconciled.** `origin/main` at `ec7ab55` (PR #6: per-invocation AI
+  provider call budgets, plus the stream/summary terminal-state fixes; owner A
+  records 011–012) is merged into the branch as merge commit `e9fa41c`. All
+  source changes in the merge come from main; this round changes no product
+  code. The three shared-file conflicts were resolved as append-only unions
+  retaining both owners' content verbatim:
+  - [contributions index](README.md): rows 001–012 in numeric order — B's 010
+    plus A's 011 and 012 — with the append-only numbering note retained.
+  - [shared AI-use log](../docs/ai-use-log.yaml): A's four entries followed by
+    B's six entries, each side's entries unchanged; this session is appended as
+    the seventh B entry.
+  - [requirements registry](../docs/req/requirements.yaml): A's five
+    requirements carry main's group-confirmed `approval: approved` state and
+    B's four remain `approval: pending`; the header keeps the group scope and
+    preserves both owners' note wording (registry structure plus the A-plan
+    confirmation, which explicitly does not approve final implementation
+    acceptance or the other owners' requirements).
+  The root [README](../README.md) auto-merged: A's status section from main and
+  B's assignment rows are both retained.
+- **Regression re-run on the merged tree.** `npm --prefix src/web ci
+  --no-audit --no-fund` (159 packages), `npm --prefix src/web run build`
+  (exit 0, chunk-size warning only), `npm --prefix src/web test -- --run`
+  (62 files / 251 tests passed, matching A's reported count) and
+  `go -C src test ./...` (43 `ok` packages, 11 `[no test files]` packages, also
+  verified uncached with `-count=1`). The full unfiltered Go suite passes in
+  this environment, including the FFmpeg exact-duration test that A's
+  verification record lists as a pre-existing failure on A's machine; no test
+  was skipped, consistent with the retained B baseline logs.
+- **Exports re-verified by checksum.** All five retained owner-local exports
+  (B's first six log entries; the second and third share one export) were
+  re-verified by sha256 against the checksums recorded in the shared log and
+  the local README; all five match, so the exports are intact and unaltered.
+  They remain owner-local under gitignored `docs/transcripts/owner-b/` and can
+  be supplied for course review on request.
+
+This session is recorded as B-AI-007, with its own export captured at session
+end. The approval applies to `33016ce`; **independent verification of the
+resulting merged head is still required** before merge. This documentation
+round does not claim it, and no implementation, evaluation run or approval is
+claimed.
 
 ## Presentation explanation
 
