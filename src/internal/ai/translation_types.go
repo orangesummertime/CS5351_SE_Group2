@@ -36,11 +36,16 @@ type ChatRequest struct {
 	Revision  int64         `json:"revision"`
 	Model     string        `json:"model,omitempty"`
 	Clear     bool          `json:"clear,omitempty"`
+	// MaxProviderCalls optionally caps started completion POSTs for this
+	// invocation. Omitted means unlimited; explicit values must be 1..100.
+	MaxProviderCalls *int `json:"maxProviderCalls,omitempty"`
 }
 type ChatResult struct {
 	ContentID string        `json:"contentId"`
 	Messages  []ChatMessage `json:"messages"`
 	UpdatedAt int64         `json:"updatedAt"`
+	// Budget is present only for limited invocations.
+	Budget *BudgetReport `json:"budget,omitempty"`
 }
 type Chatter interface {
 	Chat(context.Context, Config, string, []ChatMessage) (string, error)
@@ -61,6 +66,9 @@ type Input struct {
 	Revision       int64           `json:"revision"`
 	// Regenerate discards the stored translation of this text first.
 	Regenerate bool `json:"regenerate,omitempty"`
+	// MaxProviderCalls optionally caps started completion POSTs for this
+	// invocation. Omitted means unlimited; explicit values must be 1..100.
+	MaxProviderCalls *int `json:"maxProviderCalls,omitempty"`
 }
 
 type Result struct {
@@ -73,6 +81,8 @@ type Result struct {
 	Total          int      `json:"total"`
 	Texts          []string `json:"texts"`
 	UpdatedAt      int64    `json:"updatedAt"`
+	// Budget is present only for limited invocations.
+	Budget *BudgetReport `json:"budget,omitempty"`
 }
 
 type Inspection struct {

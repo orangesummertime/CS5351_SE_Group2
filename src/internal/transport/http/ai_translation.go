@@ -1,6 +1,7 @@
 package httptransport
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -38,7 +39,11 @@ func (h *aiHandler) aiSubtitleTranslate(w http.ResponseWriter, r *http.Request) 
 	}
 	result, err := h.ai.AI.Translate(r.Context(), input)
 	if err != nil {
-		aiFail(w, err)
+		if errors.Is(err, context.Canceled) {
+			return
+		}
+		status, body := classifyAIError(err)
+		writeAIBudgetError(w, status, body, result.Budget, translationPartial(result))
 		return
 	}
 	write(w, 200, result)

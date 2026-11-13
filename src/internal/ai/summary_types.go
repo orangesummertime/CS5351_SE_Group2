@@ -39,6 +39,9 @@ type SummaryInput struct {
 	Revision  int64            `json:"revision"`
 	// Regenerate discards the stored summary of this text first.
 	Regenerate bool `json:"regenerate,omitempty"`
+	// MaxProviderCalls optionally caps started completion POSTs for this
+	// invocation. Omitted means unlimited; explicit values must be 1..100.
+	MaxProviderCalls *int `json:"maxProviderCalls,omitempty"`
 }
 
 type SummaryPoint struct {
@@ -219,6 +222,8 @@ type SummaryResult struct {
 	Citations      []SummaryCitation `json:"citations,omitempty"`
 	Outline        []SummaryOutline  `json:"outline,omitempty"`
 	UpdatedAt      int64             `json:"updatedAt"`
+	// Budget is present only for limited invocations.
+	Budget *BudgetReport `json:"budget,omitempty"`
 }
 
 type SummaryInspection struct {
@@ -254,13 +259,14 @@ type summaryCache struct {
 
 func (in *SummaryInput) UnmarshalJSON(data []byte) error {
 	var raw struct {
-		ContentID  *string           `json:"contentId"`
-		Source     *string           `json:"source"`
-		Text       *string           `json:"text"`
-		Segments   *[]SummarySegment `json:"segments"`
-		Blocks     *[]SummaryBlock   `json:"blocks"`
-		Revision   *int64            `json:"revision"`
-		Regenerate bool              `json:"regenerate"`
+		ContentID        *string           `json:"contentId"`
+		Source           *string           `json:"source"`
+		Text             *string           `json:"text"`
+		Segments         *[]SummarySegment `json:"segments"`
+		Blocks           *[]SummaryBlock   `json:"blocks"`
+		Revision         *int64            `json:"revision"`
+		Regenerate       bool              `json:"regenerate"`
+		MaxProviderCalls *int              `json:"maxProviderCalls"`
 	}
 	decoder := json.NewDecoder(strings.NewReader(string(data)))
 	decoder.DisallowUnknownFields()
@@ -276,7 +282,7 @@ func (in *SummaryInput) UnmarshalJSON(data []byte) error {
 	if raw.ContentID == nil || raw.Source == nil || raw.Revision == nil || raw.Text == nil && raw.Segments == nil && raw.Blocks == nil {
 		return ErrInvalid
 	}
-	*in = SummaryInput{ContentID: *raw.ContentID, Source: *raw.Source, Revision: *raw.Revision, Regenerate: raw.Regenerate}
+	*in = SummaryInput{ContentID: *raw.ContentID, Source: *raw.Source, Revision: *raw.Revision, Regenerate: raw.Regenerate, MaxProviderCalls: raw.MaxProviderCalls}
 	if raw.Text != nil {
 		in.Text = *raw.Text
 	}

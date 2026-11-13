@@ -13,6 +13,8 @@ import { SettingsTask } from '../settings/ui/SettingsActionPage'
 import { SettingsRow, SettingsStatus } from '../settings/ui/SettingsRow'
 import './ai-settings.css'
 import { useTranslationLanguage } from './useTranslationLanguage'
+import { CallLimitField } from './CallLimitField'
+import { callLimitField, parseCallLimit } from './callBudget'
 import { translationTargets } from '../subtitles/subtitleLanguageMatch'
 
 const PREVIEW_VARIABLES = { title: '示例文章标题', source_type: '文章', content: '这是一段脱敏的示例内容，用于检查变量渲染和换行效果。', target_language: '简体中文' }
@@ -73,6 +75,8 @@ export function AISettings({ active = true, section = 'provider' }: { active?: b
   const [protocol, setProtocol] = useState<Settings['protocol']>('openai')
   const [pending, setPending] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState(''), [saveState, setSaveState] = useState<'saved' | 'dirty' | 'saving' | 'error'>('saved')
   const [checking, setChecking] = useState<AITask | null>(null)
+  const [checkLimitInput, setCheckLimitInput] = useState('')
+  const checkLimitError = (() => { const parsed = parseCallLimit(checkLimitInput); return parsed.ok ? '' : parsed.message })()
   const [confirmReload, setConfirmReload] = useState(false)
   const operation = useRef<AbortController | null>(null)
   async function load() {
@@ -107,10 +111,12 @@ export function AISettings({ active = true, section = 'provider' }: { active?: b
   function updateEnabledModels(next: string[]) { setEnabledModels(next); if (model && !next.includes(model)) setModel(''); if (chatModel && !next.includes(chatModel)) setChatModel(''); if (summaryModel && !next.includes(summaryModel)) setSummaryModel('') }
   async function check(task: AITask) {
     if (!saved || pending || dirty) return
+    const parsedLimit = parseCallLimit(checkLimitInput)
+    if (!parsedLimit.ok) { setError(parsedLimit.message); return }
     const current = new AbortController(); operation.current = current
     setPending(true); setChecking(task); setError(''); setNotice('')
     try {
-      const result = await request<AICheckResult>('/ai/check', { method: 'POST', signal: current.signal, body: JSON.stringify({ task, revision: saved.revision }) })
+      const result = await request<AICheckResult>('/ai/check', { method: 'POST', signal: current.signal, body: JSON.stringify({ task, revision: saved.revision, ...callLimitField(parsedLimit.value) }) })
       if (!current.signal.aborted) setNotice(`${task === 'translation' ? '翻译' : '摘要'}连接正常：${result.model}，${(result.elapsedMs / 1000).toFixed(1)} 秒。`)
     } catch (cause) {
       if (!current.signal.aborted) setError(`${task === 'translation' ? '翻译' : '摘要'}检测失败：${cause instanceof Error ? cause.message : '请检查接口和模型。'}`)
@@ -119,7 +125,7 @@ export function AISettings({ active = true, section = 'provider' }: { active?: b
     }
   }
   const modelOptions = (task: 'translation' | 'summary' | 'chat') => modelsForTask(mergeModelLists(availableModels, enabledModels), enabledModels, task).map(value => <option key={value} value={value}>{value}</option>)
-  const checkButtons = <>{(['translation', 'summary'] as const).map(task => <Button key={task} aria-label={`检测${task === 'translation' ? '翻译' : '摘要'}连接`} type="button" variant="secondary" title={dirty ? '先保存修改后的设置' : undefined} disabled={pending || Boolean(dirty) || saved?.translating || !(task === 'translation' ? saved?.ready : saved?.summaryReady)} onClick={() => void check(task)} icon={checking === task ? <LoaderCircle size={14} className="spin"/> : <PlugZap size={14}/>}>测试{task === 'translation' ? '翻译' : '摘要'}</Button>)}{checking && <Button type="button" variant="quiet" onClick={() => { operation.current?.abort(); setPending(false); setChecking(null) }}><X size={14}/>取消检测</Button>}</>
+  const checkButtons = <>{(['translation', 'summary'] as const).map(task => <Button key={task} aria-label={`检测${task === 'translation' ? '翻译' : '摘要'}连接`} type="button" variant="secondary" title={dirty ? '先保存修改后的设置' : undefined} disabled={pending || Boolean(dirty) || Boolean(checkLimitError) || saved?.translating || !(task === 'translation' ? saved?.ready : saved?.summaryReady)} onClick={() => void check(task)} icon={checking === task ? <LoaderCircle size={14} className="spin"/> : <PlugZap size={14}/>}>测试{task === 'translation' ? '翻译' : '摘要'}</Button>)}{checking && <Button type="button" variant="quiet" onClick={() => { operation.current?.abort(); setPending(false); setChecking(null) }}><X size={14}/>取消检测</Button>}</>
   return <div className="ai-settings-workspace" hidden={section === 'asr'}>
     {confirmReload && <div className="cookie-confirm" role="group" aria-label="放弃未保存的设置"><p>刷新会丢弃未保存的修改。</p><div><Button type="button" variant="secondary" onClick={() => setConfirmReload(false)}>继续编辑</Button><Button type="button" variant="quiet" onClick={() => void load()}>放弃修改</Button></div></div>}
     {saved && <form className="ai-config ai-settings-form" onSubmit={event => void save(event)}>
@@ -130,6 +136,7 @@ export function AISettings({ active = true, section = 'provider' }: { active?: b
           <SettingsRow setting="ai-url" title="接口地址"><input aria-label="接口地址" type="url" value={baseUrl} onChange={event => setBaseUrl(event.target.value)} placeholder="https://api.openai.com/v1" autoComplete="off" maxLength={2048} required disabled={pending}/></SettingsRow>
           <SettingsRow setting="ai-key" title="API 密钥" description="只保存在本机"><input aria-label="API 密钥" type="password" value={key} onChange={event => setKey(event.target.value)} placeholder={saved.hasKey ? '已保存；留空保留' : '本机服务可留空'} maxLength={4096} autoComplete="new-password" disabled={pending || noKey}/><label><input type="checkbox" checked={noKey} onChange={event => { setNoKey(event.target.checked); setKey('') }} disabled={pending}/>无需密钥（清除旧密钥）</label></SettingsRow>
           <SettingsRow className="ai-connection-row" setting="ai-connection" title="连接状态" description={requiresKey ? '更换接口后，请填写新密钥或选择无需密钥。' : '使用已保存的任务模型测试连接'}><SettingsStatus tone={saved.ready ? 'positive' : 'neutral'}>{saved.ready ? '已配置' : '等待配置'}</SettingsStatus>{checkButtons}</SettingsRow>
+          <SettingsRow setting="ai-check-limit" title="连接检测调用上限" description="留空表示不限制"><CallLimitField id="ai-check-call-limit" value={checkLimitInput} onChange={setCheckLimitInput} error={checkLimitError}/></SettingsRow>
         </div>
       </SettingsTask>
       </div>

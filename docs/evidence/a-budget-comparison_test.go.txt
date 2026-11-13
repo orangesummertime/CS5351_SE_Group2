@@ -1,0 +1,411 @@
+// Owner A fixed-input comparison measurement. This is ONE external Go test
+// source that compiles unchanged against both the untouched upstream checkout
+// and the budget implementation checkout. It is stored as a .txt file and is
+// never part of the module build; it is compiled only through a go -overlay JSON
+// that maps a virtual file inside src/internal/ai to this file (see
+// docs/evidence/a-budget-comparison.md for the exact commands).
+//
+// WHAT THIS MEASURES — precisely:
+//
+//   - The real service workflow: ai.Service.SummaryGenerate and
+//     ai.Service.Translate run unmodified, including grouping, batching,
+//     checkpointing and the per-invocation budget on the current code.
+//   - The real transport boundary: a scripted provider wrapper calls the real
+//     aichat.Client.Chat once per provider operation. That Chat performs the
+//     actual HTTP POST to the httptest upstream, so the reservation and usage
+//     reconciliation the adapter applies on the current code and ignores on the
+//     original both run for real.
+//   - The fixed response and fixed draft/segments are derived from the request
+//     exactly like the proven fakes in internal/ai/budget_service_test.go.
+//
+// This is deterministic fake-provider workflow measurement. It is NOT model
+// quality, prompt decoding or a real-provider evaluation, and it makes no
+// elapsed-time improvement claim.
+//
+// CROSS-VERSION SAFETY:
+// The wrapper returns public ai types only (ai.SummaryDraft, ai.SummaryPoint,
+// ai.Segment). The optional maxProviderCalls limit is set by json.Unmarshal, so
+// the source compiles where the Go field does not exist. The optional budget
+// report is read back by marshalling the result to a map, so no budget-only Go
+// type is referenced.
+
+package ai_test
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"tangentry/internal/adapters/aichat"
+	"tangentry/internal/ai"
+	"tangentry/internal/subtitles"
+)
+
+const compareVersionEnv = "OWNER_A_COMPARE_VERSION"
+
+// Fixed fixture usage attached to every real Chat POST. 2/3/5 mirrors the
+// usage triple used by the proven service-budget test fakes.
+const (
+	comparePromptTokens     = 2
+	compareCompletionTokens = 3
+	compareTotalTokens      = comparePromptTokens + compareCompletionTokens
+)
+
+// compareUpstream is a deterministic OpenAI-compatible provider. It counts
+// every real completion POST and always returns standard chat content "ok" with
+// a fixed valid usage triple. It never contacts a real provider.
+type compareUpstream struct {
+	server *httptest.Server
+	posts  atomic.Int64
+}
+
+func newCompareUpstream(t *testing.T) *compareUpstream {
+	t.Helper()
+	up := &compareUpstream{}
+	up.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/models" {
+			_, _ = w.Write([]byte(`{"data":[{"id":"compare-summary"}]}`))
+			return
+		}
+		up.posts.Add(1)
+		body, _ := json.Marshal(map[string]any{
+			"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"content": "ok"}}},
+			"usage":   map[string]any{"prompt_tokens": comparePromptTokens, "completion_tokens": compareCompletionTokens, "total_tokens": compareTotalTokens},
+		})
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(up.server.Close)
+	return up
+}
+
+// scriptedSummary wraps the real adapter. It implements ai.Summarizer and
+// advertises plain summary support but NOT document support, so both checkouts
+// take the legacy leaf/reduce workflow. Each Summarize operation performs one
+// real aichat.Client.Chat HTTP POST, then returns the proven fixed draft: a
+// reduce draft citing every draft point, otherwise a leaf draft citing every
+// requested segment index.
+type scriptedSummary struct {
+	client *aichat.Client
+	base   string
+}
+
+func (p *scriptedSummary) SupportsSummary(ai.Config) bool { return true }
+
+func (p *scriptedSummary) Summarize(ctx context.Context, config ai.Config, request ai.SummaryRequest) (ai.SummaryDraft, error) {
+	config.BaseURL = p.base
+	if _, err := p.client.Chat(ctx, config, "fixture", []ai.ChatMessage{{Role: "user", Content: "fixture"}}); err != nil {
+		return ai.SummaryDraft{}, err
+	}
+	if request.Mode == "reduce" {
+		var allowed []int
+		for _, draft := range request.Drafts {
+			for _, point := range draft.Points {
+				allowed = append(allowed, point.Indices...)
+			}
+		}
+		return ai.SummaryDraft{Overview: "归并概述", Points: []ai.SummaryPoint{{Text: "归并要点", Indices: allowed}}}, nil
+	}
+	indices := make([]int, len(request.Segments))
+	for i, segment := range request.Segments {
+		indices[i] = segment.Index
+	}
+	return ai.SummaryDraft{Overview: "概述", Points: []ai.SummaryPoint{{Text: "要点", Indices: indices}}}, nil
+}
+
+// scriptedTranslation wraps the real adapter. It implements ai.Translator; each
+// Translate operation performs one real aichat.Client.Chat HTTP POST, then
+// returns correctly indexed fixed Chinese segments, exactly like the proven
+// budgetTranslator fake. Batching stays real in ai.Service.
+type scriptedTranslation struct {
+	client *aichat.Client
+	base   string
+}
+
+func (p *scriptedTranslation) Translate(ctx context.Context, config ai.Config, segments []ai.Segment) ([]ai.Segment, error) {
+	config.BaseURL = p.base
+	if _, err := p.client.Chat(ctx, config, "fixture", []ai.ChatMessage{{Role: "user", Content: "fixture"}}); err != nil {
+		return nil, err
+	}
+	out := make([]ai.Segment, len(segments))
+	for i, segment := range segments {
+		out[i] = ai.Segment{Index: segment.Index, Text: "译" + segment.Text}
+	}
+	return out, nil
+}
+
+// compareService builds a fresh service with its own temporary storage. The
+// scripted wrappers share one real adapter bound to the fixture upstream. The
+// summary model differs from the translation model so the summary path is
+// independent of translation-model detection on both checkouts.
+func compareService(t *testing.T, upstream *compareUpstream) (*ai.Service, int64) {
+	t.Helper()
+	client := aichat.New()
+	summary := &scriptedSummary{client: client, base: upstream.server.URL}
+	translation := &scriptedTranslation{client: client, base: upstream.server.URL}
+	service, err := ai.New(filepath.Join(t.TempDir(), "ai"), ai.NewMemoryResults(), translation, summary)
+	if err != nil {
+		t.Fatalf("ai.New: %v", err)
+	}
+	t.Cleanup(service.Close)
+	summaryModel := "compare-summary"
+	if _, err := service.Configure(ai.ConfigureInput{BaseURL: upstream.server.URL, Model: "compare-model", SummaryModel: &summaryModel, Revision: 1}); err != nil {
+		t.Fatalf("configure: %v", err)
+	}
+	return service, service.Status().Revision
+}
+
+// compareSummarySegments mirrors the proven A-T02 fixture: four ~8000-byte
+// segments exceed the default 28000-byte leaf budget, yielding exactly two leaf
+// groups (3 + 1) plus a single reduction. The input is fixed and deterministic.
+func compareSummarySegments() []string {
+	big := strings.Repeat("word ", 1600)
+	return []string{big, big, big, big}
+}
+
+// setProviderLimit sets an optional *int MaxProviderCalls field by reflection
+// when the compiled version has it. The original checkout has no such field, so
+// the limit is silently ignored there, exactly like an unknown JSON field would
+// be for an API that did not validate it. No budget type is referenced.
+func setProviderLimit(target any, callLimit int) {
+	if callLimit <= 0 {
+		return
+	}
+	value := reflect.ValueOf(target)
+	if value.Kind() != reflect.Ptr || value.IsNil() {
+		return
+	}
+	field := value.Elem().FieldByName("MaxProviderCalls")
+	if !field.IsValid() || field.Kind() != reflect.Ptr || field.Type().Elem().Kind() != reflect.Int {
+		return
+	}
+	limit := callLimit
+	field.Set(reflect.ValueOf(&limit))
+}
+
+// compareSummaryInput builds the proven A-T02 summary fixture through common
+// struct fields and applies the optional limit only when the compiled version
+// exposes it.
+func compareSummaryInput(rev int64, callLimit int) ai.SummaryInput {
+	big := strings.Repeat("word ", 1600)
+	input := ai.SummaryInput{ContentID: "rss:" + strings.Repeat("b", 64), Source: "article:original", Revision: rev}
+	for i := 0; i < 4; i++ {
+		input.Segments = append(input.Segments, ai.SummarySegment{Index: i, Text: big})
+	}
+	setProviderLimit(&input, callLimit)
+	return input
+}
+
+// compareTranslationInput builds the proven A-T03 article fixture: 16 short
+// cues split into two article batches of 8.
+func compareTranslationInput(rev int64, callLimit int) ai.Input {
+	input := ai.Input{ContentID: "rss:" + strings.Repeat("a", 64), Source: "article", Revision: rev, Track: subtitles.Track{Language: "text-article"}}
+	for i := 0; i < 16; i++ {
+		input.Track.Cues = append(input.Track.Cues, subtitles.Cue{Start: float64(i), End: float64(i) + 1, Text: fmt.Sprintf("short cue %d", i)})
+	}
+	setProviderLimit(&input, callLimit)
+	return input
+}
+
+// compareSummaryFingerprint hashes the fixed summary segment texts so the
+// evidence shows identical inputs across versions.
+func compareSummaryFingerprint() string {
+	var builder strings.Builder
+	for i := 0; i < 4; i++ {
+		builder.WriteString(strings.Repeat("word ", 1600))
+		builder.WriteString("\x00")
+	}
+	sum := sha256.Sum256([]byte(builder.String()))
+	return hex.EncodeToString(sum[:8])
+}
+
+func compareTranslationFingerprint() string {
+	var builder strings.Builder
+	for i := 0; i < 16; i++ {
+		fmt.Fprintf(&builder, "short cue %d\x00", i)
+	}
+	sum := sha256.Sum256([]byte(builder.String()))
+	return hex.EncodeToString(sum[:8])
+}
+
+// compareBudget reads the optional budget report from any JSON-serialisable
+// result. The original checkout has no budget field, so the map simply lacks the
+// key and the status falls back to the outcome derived from the error.
+func compareBudget(value any) map[string]any {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return nil
+	}
+	var envelope map[string]any
+	if json.Unmarshal(encoded, &envelope) != nil {
+		return nil
+	}
+	report, _ := envelope["budget"].(map[string]any)
+	return report
+}
+
+func compareErrorText(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
+}
+
+func compareStatus(err error, report map[string]any) string {
+	if status, _ := report["status"].(string); status != "" {
+		return status
+	}
+	if err == nil {
+		return "completed"
+	}
+	return "error"
+}
+
+// emitComparison writes one JSON line of measured evidence. Raw output stays on
+// stdout so the caller can redirect it outside the repository.
+func emitComparison(t *testing.T, version string, line map[string]any) {
+	line["version"] = version
+	encoded, err := json.Marshal(line)
+	if err != nil {
+		t.Fatalf("marshal evidence: %v", err)
+	}
+	t.Logf("OWNER_A_COMPARE %s", encoded)
+}
+
+func compareLimitLabel(callLimit int) any {
+	if callLimit == 0 {
+		return "omitted"
+	}
+	return callLimit
+}
+
+// TestOwnerAComparison runs the fixed summary and translation inputs at
+// omitted, 1 and 3 limits and records actual provider POST counts, elapsed time,
+// outcome and known usage. Note: with the AT02 fixture the summary plan is
+// two leaves + one reduction = 3 planned POSTs. The expected counts below are
+// recorded from that proven plan; any different observed count is reported,
+// not hidden.
+func TestOwnerAComparison(t *testing.T) {
+	version := os.Getenv(compareVersionEnv)
+	if version == "" {
+		version = "unlabelled"
+	}
+	upstream := newCompareUpstream(t)
+	const translationCues = 16
+	const translationBatches = 2 // 16 cues / 8 per article POST (proven A-T03 fixture)
+
+	for _, callLimit := range []int{0, 1, 3} {
+		// Summary arm.
+		service, rev := compareService(t, upstream)
+		summary := compareSummaryInput(rev, callLimit)
+		before := upstream.posts.Load()
+		start := time.Now()
+		result, runErr := service.SummaryGenerate(context.Background(), summary)
+		elapsed := time.Since(start).Milliseconds()
+		report := compareBudget(result)
+		line := map[string]any{
+			"kind": "summary", "inputHash": compareSummaryFingerprint(), "limit": compareLimitLabel(callLimit),
+			"providerPosts": upstream.posts.Load() - before, "elapsedMs": elapsed,
+			"status": compareStatus(runErr, report), "error": compareErrorText(runErr),
+			"complete": result.Complete, "completedCalls": result.CompletedCalls, "totalCalls": result.TotalCalls,
+		}
+		if report != nil {
+			line["budgetStarted"] = report["started"]
+			line["budgetUsageKnown"] = report["usageKnown"]
+			line["budgetCumulative"] = report["cumulative"]
+		}
+		emitComparison(t, version, line)
+		compareAssertSummary(t, version == "current", callLimit, upstream.posts.Load()-before, result, runErr)
+		service.Close()
+
+		// Translation arm.
+		service, rev = compareService(t, upstream)
+		translation := compareTranslationInput(rev, callLimit)
+		before = upstream.posts.Load()
+		start = time.Now()
+		translated, translateErr := service.Translate(context.Background(), translation)
+		elapsed = time.Since(start).Milliseconds()
+		report = compareBudget(translated)
+		line = map[string]any{
+			"kind": "translation", "inputHash": compareTranslationFingerprint(), "limit": compareLimitLabel(callLimit),
+			"providerPosts": upstream.posts.Load() - before, "elapsedMs": elapsed,
+			"status": compareStatus(translateErr, report), "error": compareErrorText(translateErr),
+			"complete": translated.Total > 0 && len(translated.Texts) == translated.Total,
+			"texts":    len(translated.Texts), "total": translated.Total,
+		}
+		if report != nil {
+			line["budgetStarted"] = report["started"]
+			line["budgetUsageKnown"] = report["usageKnown"]
+			line["budgetCumulative"] = report["cumulative"]
+		}
+		emitComparison(t, version, line)
+		compareAssertTranslation(t, version == "current", callLimit, translationCues, translationBatches, upstream.posts.Load()-before, translated, translateErr)
+		service.Close()
+	}
+}
+
+// compareAssertSummary checks the deterministic call behavior for the measured
+// version with the proven AT02 plan (two leaves + one reduction = 3 POSTs).
+// The original checkout has no admission cap, so it always runs the full plan.
+// The current implementation stops at the limit. No elapsed-time claim is made.
+func compareAssertSummary(t *testing.T, current bool, callLimit int, posts int64, result ai.SummaryResult, err error) {
+	t.Helper()
+	switch {
+	case !current:
+		if posts != 3 || !result.Complete {
+			t.Fatalf("baseline summary limit %d ignored: posts=%d complete=%v err=%v", callLimit, posts, result.Complete, err)
+		}
+	case callLimit == 0:
+		if posts != 3 || !result.Complete {
+			t.Fatalf("current summary omitted limit: posts=%d complete=%v err=%v", posts, result.Complete, err)
+		}
+	case callLimit == 1:
+		// Two leaves needed; limit 1 starts one leaf then stops with a partial,
+		// non-complete checkpoint.
+		if posts != 1 || result.Complete || result.CompletedCalls != 1 {
+			t.Fatalf("current summary limit 1: posts=%d complete=%v completed=%d err=%v", posts, result.Complete, result.CompletedCalls, err)
+		}
+	case callLimit == 3:
+		// Limit 3 fits the full plan (two leaves + one reduction) exactly and
+		// completes even though the limit is fully used.
+		if posts != 3 || !result.Complete {
+			t.Fatalf("current summary limit 3: posts=%d complete=%v err=%v", posts, result.Complete, err)
+		}
+	}
+}
+
+// compareAssertTranslation checks the deterministic call behavior. The fixed
+// input is 16 short article cues (proven A-T03 fixture); article batching is 8
+// cues per POST, so the workflow runs 2 batches. The original starts both; the
+// current implementation stops at the limit with committed partial batches.
+func compareAssertTranslation(t *testing.T, current bool, callLimit, cues, batches int, posts int64, result ai.Result, err error) {
+	t.Helper()
+	switch {
+	case !current:
+		if posts != int64(batches) || result.Total != cues || len(result.Texts) != cues {
+			t.Fatalf("baseline translation limit %d ignored: posts=%d texts=%d err=%v", callLimit, posts, len(result.Texts), err)
+		}
+	case callLimit == 0:
+		if posts != int64(batches) || len(result.Texts) != cues {
+			t.Fatalf("current translation omitted limit: posts=%d texts=%d err=%v", posts, len(result.Texts), err)
+		}
+	case callLimit == 1:
+		if posts != 1 || len(result.Texts) != 8 {
+			t.Fatalf("current translation limit 1: posts=%d texts=%d err=%v", posts, len(result.Texts), err)
+		}
+	case callLimit == 3:
+		if posts != int64(batches) || len(result.Texts) != cues {
+			t.Fatalf("current translation limit 3: posts=%d texts=%d err=%v", posts, len(result.Texts), err)
+		}
+	}
+}

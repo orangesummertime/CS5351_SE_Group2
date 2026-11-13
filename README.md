@@ -2,7 +2,7 @@
 
 本仓库是 [Tangentry](https://github.com/mu-zi-lee/Tangentry) 的 fork，用于 CS5351 小组项目。原项目的完整功能介绍、安装和使用说明请看 **[Tangentry 原仓库 README](https://github.com/mu-zi-lee/Tangentry/blob/main/README.md)**；下方也保留了 fork 时的原版说明。
 
-我们以 Tangentry 的本地优先内容阅读器为基础，计划改进 AI 阅读问答的证据追溯、长内容检索和资源控制。当前仅完成 fork、项目说明与需求草案，以下方向仍是候选需求，不能视为已实现功能：
+我们以 Tangentry 的本地优先内容阅读器为基础，改进 AI 阅读问答的证据追溯、长内容检索和资源控制。本分支已实现 A 的每次任务共享 AI 调用预算，并附测试和对照证据，待实现 PR 独立审查与合并；其余方向仍按各模块的实际交付状态推进，不能把候选需求视为已实现功能：
 
 - 按问题检索相关原文片段，减少长内容被简单截断造成的信息遗漏。
 - 为问答结果提供可核对的原文引用，并由程序验证来源、版本和引用文本。
@@ -55,13 +55,15 @@ FR-02 交付的是**选片段**，FR-03 交付的是**回答引用核验**，FR-
 
 ### A：基线、共享预算与集成
 
-- [x] 汇集原版测试记录与 provider 调用链，准备 [A 的实施／测试计划](docs/plans/a-budget-preimplementation.md)、[候选 ADR](docs/architecture/adr/001-provider-call-budget.md) 和 [需求草案](docs/req/requirements.yaml)；设计已在 PR #1 获独立审查并合并，预算代码尚未实现。
-- [x] 按审查方案实测两家 provider 的非流式与流式用量字段；见 [A 的真实测量结果](docs/evidence/a-live-usage-presence.md)。（PR #4 待独立审查；批准前不开始实现。）
+- [x] 汇集原版测试记录与 provider 调用链，准备 [A 的实施／测试计划](docs/plans/a-budget-preimplementation.md)、[ADR](docs/architecture/adr/001-provider-call-budget.md) 和 [A 需求](docs/req/requirements.yaml)。（设计 PR #1 已合并；后续已获组员确认继续实施。）
+- [x] 按审查方案实测两家 provider 的非流式与流式用量字段；见 [A 的真实测量结果](docs/evidence/a-live-usage-presence.md)。（证据 PR #4 已合并。）
 - [x] 明确一次 AI 任务的边界、可计量指标、并发预留、未知用量及中途取消策略，并写成需求与 ADR。（PR #1 已合并。）
-- [x] 设计预算在 AI 服务与 provider 适配器之间的接口，覆盖问答及本项目新增调用，不把客户端显示值当作权威计量；见 [A 的接口清单](docs/plans/a-integration-contract.md)。（PR #5 待审查；最终 wire schema 仍待实现评审。）
-- [ ] 用固定响应测试正常、超限、用量缺失、重试和并发场景；验证停止后不再启动不允许的新调用。
-- [ ] 保持上游原有摘要、翻译和问答路径可用，汇总各模块的接口契约与回归结果。
-- [ ] 记录固定输入下的原版／改进版调用量、耗时和结果，注明模型响应的波动及测试局限。
+- [x] 设计并实现预算在 AI 服务与 provider 适配器之间的接口，覆盖问答、摘要、翻译、Check 和继承任务上下文的调用；不把客户端值当作权威计量；见 [A 的接口清单](docs/plans/a-integration-contract.md)。（清单 PR #5 已合并；实现及新增 wire 字段待本次 PR 审查、未合并。）
+- [x] 用固定响应测试正常、超限、用量缺失、重试、半批恢复和并发场景；验证停止后不再启动不允许的新调用；见 [A-T01–A-T22 验证映射](docs/evidence/a-budget-verification.md)。（实现 PR 待独立审查、未合并。）
+- [x] 保持上游原有摘要、翻译和问答默认路径可用，汇总当前接口契约及回归结果；见 [验证结果与边界](docs/evidence/a-budget-verification.md)。（实现 PR 待独立审查、未合并；B/C/D 后续新增入口合入时仍需联调复测。）
+- [x] 记录固定输入下的原版／改进版调用量、耗时和结果，注明固定替身、真实用量证据与模型质量评估的区别；见 [12 条对照测量](docs/evidence/a-budget-comparison.md)。（实现 PR 待独立审查、未合并；不声称真实模型质量或速度提升。）
+
+界面调用上限留空表示 **No call limit**；填写 1–100 的整数只限制当前任务新启动的 AI 请求数，不是 token 或费用上限。停止时显示预算状态，保留有效进度；重新开始任务使用新的预算。实现与答辩说明见 [贡献记录 011](contributions/011-owner-a-budget-implementation.md)。
 
 ### B：问题相关检索
 

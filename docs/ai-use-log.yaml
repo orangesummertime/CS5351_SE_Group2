@@ -11,3 +11,45 @@ entries:
     original_session_id: ses_e2f1b5c4dffePCtP7QtFA12Wh8
     original_export: owner-local artifacts/cs5351-a-fixture-session.json
     verification: Focused Vitest run passed, 9 tests.
+  - id: AI-A-002
+    owner: Kefan CHEN
+    date: 2026-11-13
+    tool: OpenCode
+    model: CityU gateway DeepSeek V4 Flash
+    purpose: Implement the invocation ledger, adapter accounting, services and initial HTTP/UI integration under the confirmed A plan.
+    original_session_id: ses_e2d2f5558ffeL0aMc3YOI4s3iY
+    original_export: owner-local artifacts/a-budget-implementation-session-1.json
+    original_export_sha256: c12231e4e143f4b37a61d38c530750e83c32254edc6fce423923bb70674e2176
+    transcript_status: retained_complete_original_export
+    verification: Phase-specific Go, race and frontend checks; see docs/evidence/a-budget-verification.md for the final revision and known upstream exception.
+    network_activity: CityU model inference and local-loopback deterministic HTTP tests; no new live application-provider evaluation.
+    review: Group confirmation preceded implementation; final implementation PR review remains pending.
+  - id: AI-A-003
+    owner: Kefan CHEN
+    date: 2026-11-13
+    tool: OpenCode
+    model: CityU gateway DeepSeek V4 Flash
+    purpose: Complete HTTP/SSE/UI behavior, sticky failures, usage overflow handling, acceptance tests and original-versus-modified scripted workflow measurement.
+    original_session_id: ses_e2cd635a4ffe3MsU7l7BIEblhw
+    original_export: owner-local artifacts/a-budget-implementation-session-2.json
+    original_export_sha256: ccf6023363fea87c31bc8cd80899450d9f8a643609a12937b529d2fd3ec542a1
+    transcript_status: retained_complete_original_export
+    verification: 62 frontend files and 251 tests passed; production build, focused and race Go checks passed; full Go regression passed excluding only the recorded existing FFmpeg exact-duration test; static vet passed.
+    evidence: docs/evidence/a-budget-comparison.json
+    network_activity: CityU model inference and local-loopback deterministic HTTP tests; upstream source was measured read-only through Go overlay.
+    review: Implementation prepared for independent review; no final acceptance or merge approval is claimed.
+  - id: AI-A-004
+    owner: Kefan CHEN
+    date: 2026-11-13
+    tool: OpenCode
+    model: CityU gateway DeepSeek V4 Flash
+    purpose: >-
+      Correct three PR6 technical findings: limited provider-stream completion,
+      usage-only chunks, and summary failure snapshot order; add regression cases.
+    original_session_id: ses_e2c9c9c08ffegoFpLrqLFNBXNP
+    original_export: owner-local artifacts/a-budget-implementation-session-3.json
+    original_export_sha256: 8a8211acffe9f9d6a7b8cef9598f5aa55584210ad784289ae690c02db4261273
+    transcript_status: retained_complete_original_export
+    verification: Focused and race Go tests, vet and otherwise-full uncached Go regression passed with only the existing FFmpeg exact-duration test excluded; current scripted workflow comparison replayed successfully. Frontend unchanged; prior 251-test/build result retained.
+    network_activity: CityU model inference and local-loopback deterministic HTTP tests; no live application-provider evaluation or browser.
+    review: Technical follow-up only; final independent implementation approval remains pending.

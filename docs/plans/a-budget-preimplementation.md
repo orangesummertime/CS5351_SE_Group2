@@ -1,6 +1,6 @@
 # A · Shared provider-call budget: implementation and test plan
 
-**Status: design approved in PR #1; live measurement complete and awaiting independent evidence review. No budget implementation code exists.** This plan covers FR-01/NFR-01.
+**Status: implementation prepared for review following group confirmation on 2026-11-13.** Design, live evidence and integration inventory were reviewed and merged in PR #1, PR #4 and PR #5 respectively. The group member confirmed proceeding under this A plan. Implementation changes still require review before merge. This plan covers FR-01/NFR-01.
 
 ## Baseline and proposed behavior
 
@@ -57,4 +57,4 @@ Fake providers or `httptest` record raw POST counts. Each row traces to a criter
 
 After live measurement and independent human approval, use course-specified OpenCode + DeepSeek V4 Flash for implementation and retain full raw sessions. Phases: domain/adapter, service/checkpoints, then HTTP/SSE/UI. After **each** phase run focused tests and full Go and frontend suites with uncached Go `-count=1`, retaining raw logs. Track existing Windows failures separately; compare like environments. Browser E2E must use only an existing or embedded browser.
 
-PR #1's final design revision received independent non-author approval and was merged. The live evidence in this follow-up still requires independent human review before implementation.
+PR #1's final design revision received independent non-author approval and was merged. PR #4's evidence and PR #5's inventory were subsequently approved and merged. Those GitHub reviews explicitly covered documentation and evidence. The group member then confirmed proceeding under the existing A plan on 2026-11-13. The implementation PR must retain the test evidence and original implementation sessions and receive its own review before merge.

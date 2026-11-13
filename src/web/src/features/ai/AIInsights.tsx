@@ -9,6 +9,9 @@ import { request } from '../../shared/api/client'
 import { buildChatContext } from './chatContext'
 import { rememberedChatModel, rememberChatModel, selectedChatModel } from './chatPresentation'
 import { mergeModelLists, modelsForTask } from './modelPicker'
+import { LIMITED_CANCELLED_NOTICE, LIMITED_INCOMPLETE_NOTICE, LIMITED_INTERRUPTED_NOTICE, budgetBlocker, budgetSummaryText, callLimitField, classifyChatStreamFrame, parseCallLimit, resolveLimitedChatTerminal } from './callBudget'
+import { CallLimitField } from './CallLimitField'
+import type { AIBudgetReport } from './types'
 import './ai.css'
 
 function clock(seconds: number) { const total = Math.max(0, Math.floor(seconds)); const m = Math.floor(total / 60); return `${m}:${String(total % 60).padStart(2, '0')}` }
@@ -348,6 +351,9 @@ export function AIChatPanel({ contentId, context, revision }: { contentId: strin
   const [error, setError] = useState('')
   const [ready, setReady] = useState(false)
   const [chatRevision, setChatRevision] = useState(revision)
+  const [callLimitInput, setCallLimitInput] = useState('')
+  const [budget, setBudget] = useState<AIBudgetReport | undefined>(undefined)
+  const callLimitError = (() => { const parsed = parseCallLimit(callLimitInput); return parsed.ok ? '' : parsed.message })()
   const abort = useRef<AbortController | null>(null)
   const composer = useRef<HTMLTextAreaElement>(null)
   const conversation = useRef<HTMLDivElement>(null)
@@ -383,15 +389,35 @@ export function AIChatPanel({ contentId, context, revision }: { contentId: strin
   }, [messages, pending, error])
   const send = async (question = input.trim(), conversation = messages) => {
     const value = question.trim(); if (!value || pending || !model || !ready) return
+    const parsedLimit = parseCallLimit(callLimitInput)
+    if (!parsedLimit.ok) { setError(parsedLimit.message); return }
     const next = [...conversation, { role: 'user' as const, content: value }]
     follow.current = true
-    setMessages(next); setInput(''); setPending(true); setError('')
+    setMessages(next); setInput(''); setPending(true); setError(''); setBudget(undefined)
     const controller = new AbortController(); abort.current = controller
+    // An explicitly limited run may only complete on a completed SSE frame; a
+    // normal EOF after deltas without one is an interrupted result, not success.
+    const limited = parsedLimit.value !== undefined
+    let sawCompletedFrame = false
+    // Per-invocation report so failure notices never read stale React state.
+    let budgetReport: AIBudgetReport | undefined
+    let budgetBlocked = false
+    const acceptBudget = (report?: AIBudgetReport) => {
+      if (!report) return
+      budgetReport = report
+      setBudget(report)
+      if (report.status === 'usage_unknown' || report.status === 'budget_exhausted' || report.status === 'cancelled' || report.status === 'provider_error') budgetBlocked = true
+    }
     try {
-      const response = await fetch('/api/ai/chat', { method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ contentId, context, messages: next.filter(message => message.content.trim()).slice(-39), model, revision: chatRevision }) })
-      if (!response.ok || !response.body) { const body = await response.json().catch(() => ({})) as { message?: string }; throw new Error(body.message ?? '对话暂时不可用。') }
+      const response = await fetch('/api/ai/chat', { method: 'POST', signal: controller.signal, headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify({ contentId, context, messages: next.filter(message => message.content.trim()).slice(-39), model, revision: chatRevision, ...callLimitField(parsedLimit.value) }) })
+      if (!response.ok || !response.body) {
+        const body = await response.json().catch(() => ({})) as { message?: string; budget?: AIBudgetReport }
+        if (body.budget) { acceptBudget(body.budget) }
+        throw new Error(body.message ?? '对话暂时不可用。')
+      }
       if (!response.headers.get('Content-Type')?.includes('text/event-stream')) {
-        const result = await response.json() as { messages: ChatMessage[] }
+        const result = await response.json() as { messages: ChatMessage[]; budget?: AIBudgetReport }
+        if (result.budget) acceptBudget(result.budget)
         setMessages(result.messages)
         return
       }
@@ -401,9 +427,15 @@ export function AIChatPanel({ contentId, context, revision }: { contentId: strin
       const consume = (event: string) => {
         const payload = event.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n')
         if (!payload) return
-        const data = JSON.parse(payload) as { delta?: string; error?: string }
-        if (data.error) throw new Error(data.error)
-        if (data.delta) { answer += data.delta; setMessages([...next, { role: 'assistant', content: answer, model }]) }
+        const frame = classifyChatStreamFrame(JSON.parse(payload) as { delta?: string; error?: string; errorCode?: string; status?: string; budget?: AIBudgetReport; partial?: string })
+        if (frame.status === 'completed') sawCompletedFrame = true
+        if (frame.budget) acceptBudget(frame.budget)
+        if (frame.terminal) {
+          if (frame.status === 'usage_unknown' || frame.status === 'budget_exhausted') budgetBlocked = true
+          if (frame.partial) { answer = frame.partial; setMessages([...next, { role: 'assistant', content: answer, model }]) }
+          throw new Error(frame.message ?? '对话暂时不可用。')
+        }
+        if (frame.delta) { answer += frame.delta; setMessages([...next, { role: 'assistant', content: answer, model }]) }
       }
       while (true) {
         const chunk = await reader.read(); if (chunk.done) break
@@ -413,9 +445,31 @@ export function AIChatPanel({ contentId, context, revision }: { contentId: strin
       }
       buffer += decoder.decode()
       if (buffer.trim()) consume(buffer)
-      if (!answer) throw new Error('对话暂时不可用。')
+      // Resolve EOF: a limited run needs a completed frame; else keep partial text
+      // and report interrupted/incomplete without inventing usage values.
+      const terminal = resolveLimitedChatTerminal({ limited, sawCompletedFrame, answer, aborted: false })
+      if (terminal.kind === 'incomplete') throw new Error(LIMITED_INCOMPLETE_NOTICE)
+      if (terminal.kind === 'interrupted') {
+        setMessages([...next, { role: 'assistant', content: answer, model }])
+        setError(LIMITED_INTERRUPTED_NOTICE)
+        return
+      }
+      if (terminal.kind === 'cancelled') { setError(LIMITED_CANCELLED_NOTICE); return }
     }
-    catch (cause) { if (!(cause instanceof DOMException && cause.name === 'AbortError')) setError(cause instanceof Error ? cause.message : '对话暂时不可用。') }
+    catch (cause) {
+      if (cause instanceof DOMException && cause.name === 'AbortError') {
+        // Explicit user abort: keep partial text, never present it as completed.
+        if (limited) setError(LIMITED_CANCELLED_NOTICE)
+        return
+      }
+      {
+        const message = cause instanceof Error ? cause.message : '对话暂时不可用。'
+        // Preserve visible partial text; never mark a failed limited run done.
+        // Use the per-invocation report, not the captured React state.
+        const notice = budgetBlocked ? budgetBlocker(budgetReport) || message : message
+        setError(notice)
+      }
+    }
     finally {
       if (abort.current === controller) {
         setPending(false)
@@ -458,11 +512,13 @@ export function AIChatPanel({ contentId, context, revision }: { contentId: strin
       {error && <div className="ai-chat-error" role="alert"><p>{error}</p>{messages.some(message => message.role === 'user') && <Button variant="quiet" type="button" disabled={pending || !ready} onClick={retry}><RotateCcw size={14}/>重新尝试</Button>}</div>}
     </div>
     {ready && !model && <p className="ai-chat-setup" role="status">请在<a href="/tools#ai/text">AI 设置</a>中选择对话模型。</p>}
+    {budget && <p className="ai-chat-budget" role="status">{budgetSummaryText(budget)}</p>}
+    <CallLimitField id="chat-call-limit" value={callLimitInput} onChange={setCallLimitInput} error={callLimitError} budget={undefined}/>
     <form className="ai-chat-composer" onSubmit={event => { event.preventDefault(); void send() }}>
       <textarea ref={composer} aria-label="输入问题" value={input} maxLength={12000} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void send() } }} placeholder="围绕这篇内容提问…" rows={2}/>
       <div className="ai-chat-toolbar">
         <Select aria-label="对话模型" title={model || '选择模型'} value={model} onChange={event => { setModel(event.target.value); rememberChatModel(event.target.value) }} disabled={pending || models.length === 0}><option value="">选择模型</option>{models.map(value => <option key={value} value={value}>{value.split('/').pop()}</option>)}</Select>
-        {pending ? <Button variant="quiet" iconOnly type="button" className="icon-button ai-chat-send" title="停止生成" aria-label="停止生成" onClick={() => abort.current?.abort()}><Square size={14} fill="currentColor"/></Button> : <Button variant="quiet" iconOnly type="submit" className="icon-button ai-chat-send" title="发送" aria-label="发送" disabled={!input.trim() || !model || !ready}><ArrowUp size={18}/></Button>}
+        {pending ? <Button variant="quiet" iconOnly type="button" className="icon-button ai-chat-send" title="停止生成" aria-label="停止生成" onClick={() => abort.current?.abort()}><Square size={14} fill="currentColor"/></Button> : <Button variant="quiet" iconOnly type="submit" className="icon-button ai-chat-send" title="发送" aria-label="发送" disabled={!input.trim() || !model || !ready || Boolean(callLimitError)}><ArrowUp size={18}/></Button>}
       </div>
     </form>
   </div>
