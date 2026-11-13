@@ -1,4 +1,4 @@
-# 006 · Owner B review package: hybrid question-relevant retrieval
+# 010 · Owner B review package: hybrid question-relevant retrieval
 
 - **Commit:** `docs: prepare owner B retrieval review package`; see this file's
   Git history.
@@ -6,7 +6,7 @@
 - **Scope:** B baseline, draft FR-02/NFR-02/INV-04/INV-05, ADR-002, hybrid
   retrieval test plan, evaluation protocol, PDF extraction design, debt
   register, course test layout and AI-use disclosure.
-- **Review:** Five rounds of CHANGES REQUIRED so far: the first on `55ec38b`
+- **Review:** Five rounds of CHANGES REQUIRED: the first on `55ec38b`
   (four findings and two consistency nits), the second on `78efdca` (the sweep
   trigger could stay silent when lexical distractors fill the shortlist), the
   third on `66fc582` (the share arithmetic could go negative or overflow, and
@@ -15,12 +15,17 @@
   `sweepCandidates` quota at high request budgets), and the fifth on `d37fe93`
   (the slot-budget formula assumed the question shares a batch, but the
   query/document `text_type` contract requires separate requests). All five are
-  addressed below and in the follow-up commits; a sixth review is pending. No
+  addressed below and in the follow-up commits. The sixth review, a COMMENTED
+  re-review of `70d725d`, confirmed the fifth-round fix and asked for the
+  pre-merge reconciliation recorded in the sixth-round section below.
+  Independent human approval of the resulting head is still pending. No
   implementation, evaluation run or approval is claimed.
 
 > Numbering note: this package was written as 005 while only 001 existed on
 > `main` and A's 002–004 were still unmerged. A's records have since merged, so
 > this package was renumbered to 006 to keep the shared index append-only.
+> A's 006–009 then merged through PR #4 and PR #5, so the sixth-round
+> reconciliation renumbers this package again, to 010, after A's 006–009.
 > `main` is now fully included in this branch.
 
 ## What changed and why
@@ -343,6 +348,43 @@ case the request count stayed within the limit, the shares were nonnegative and
 within their caps, and summed to at most the slot budget. The reviewer's two
 counterexamples now resolve correctly (split limit 1 → 0 candidate slots; split
 default 25 delivers 190 candidates in 25 requests).
+
+## Sixth review round (on `70d725d`)
+
+The reviewer re-reviewed the mode-aware request-accounting revision and confirmed
+the fifth-round finding resolved: the design now distinguishes shared and split
+batching, reserves the split query request, exposes the role and batching-mode
+contract, and carries the cold-cache B-T33 matrix. The reviewer independently
+recomputed 324 allocation/request-count combinations across both modes with zero
+violations, and `git diff --check` passed. This was validation of the design
+arithmetic, not execution of the future implementation tests, and not independent
+human approval.
+
+The remaining pre-merge items from that comment are addressed here:
+
+- **Reconciled with current main.** `origin/main` at `a774522` (PR #4 live usage
+  measurement and PR #5 integration contract, owner A records 006–009) is merged
+  into this branch. The two shared-file conflicts were resolved as append-only
+  unions retaining both owners' content verbatim: `contributions/README.md`
+  keeps A's 006–009 index rows and B's row, and `docs/ai-use-log.yaml` keeps A's
+  `AI-A-001` entry and B's `B-AI-001`–`B-AI-003` entries unchanged. The root
+  README keeps both A's updated checklist and B's owner claim; the requirement
+  registry already held A's FR-01/NFR-01/INV-01–03 and B's
+  FR-02/NFR-02/INV-04–05 and needed no change.
+- **Renumbered after A's 006–009.** This record moved from
+  `006-owner-b-review-package.md` to `010-owner-b-review-package.md`, and the
+  shared index row now reads 010. Earlier renumbering statements (005 → 006)
+  are kept as history; historical log entries keep the file names as they were
+  at the time.
+- **Full test gate re-run on the merged tree:** `npm --prefix src/web ci
+  --no-audit --no-fund` (159 packages), `npm --prefix src/web run build`
+  (exit 0, chunk-size warning only), `npm --prefix src/web test -- --run`
+  (61 files / 231 tests passed) and `go -C src test ./...` (43 `ok` packages,
+  11 `[no test files]` packages) — the same package-name sets as the retained
+  baseline logs, now including main's neutral `modelPicker.test.ts` fixture.
+- **Independent human review of the resulting head is still required** before
+  merge; this documentation round does not claim it, and no implementation,
+  evaluation run or approval is claimed.
 
 ## Presentation explanation
 
