@@ -123,6 +123,9 @@ func (c *Client) ChatStream(ctx context.Context, config ai.Config, source string
 		chat = append(chat, map[string]string{"role": message.Role, "content": message.Content})
 	}
 	payload := map[string]any{"model": config.Model, "stream": true, "messages": chat}
+	if err := reserveCompletion(ctx); err != nil {
+		return err
+	}
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(config.BaseURL, "/")+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
@@ -163,7 +166,11 @@ func (c *Client) ChatStream(ctx context.Context, config ai.Config, source string
 		}
 		return ai.ErrProvider
 	}
-	return parseStream(response.Body, emit)
+	usage, err := parseStream(response.Body, emit, ai.BudgetAttached(ctx))
+	if err != nil {
+		return err
+	}
+	return reconcileUsage(ctx, usage)
 }
 
 func chatSystemMessage(config ai.Config, source string) map[string]string {
@@ -176,6 +183,14 @@ func chatSystemMessage(config ai.Config, source string) map[string]string {
 }
 
 func (c *Client) responsesStream(ctx context.Context, config ai.Config, chat []map[string]string, source string, emit func(string) error) error {
+	if err := reserveCompletion(ctx); err != nil {
+		return err
+	}
+	return c.doResponsesStream(ctx, config, chat, source, emit)
+}
+
+// doResponsesStream performs one already-reserved /responses streaming POST.
+func (c *Client) doResponsesStream(ctx context.Context, config ai.Config, chat []map[string]string, source string, emit func(string) error) error {
 	input := append([]map[string]string{chatSystemMessage(config, source)}, chat[1:]...)
 	body, _ := json.Marshal(map[string]any{"model": config.Model, "stream": true, "input": input})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(config.BaseURL, "/")+"/responses", bytes.NewReader(body))
@@ -205,13 +220,25 @@ func (c *Client) responsesStream(ctx context.Context, config ai.Config, chat []m
 	if response.StatusCode != http.StatusOK {
 		return ai.ErrProvider
 	}
-	return parseResponsesStream(response.Body, emit)
+	usage, err := parseResponsesStream(response.Body, emit, ai.BudgetAttached(ctx))
+	if err != nil {
+		return err
+	}
+	return reconcileUsage(ctx, usage)
 }
 
-func parseResponsesStream(body io.Reader, emit func(string) error) error {
+// parseResponsesStream consumes Responses SSE events and returns whatever usage
+// block was observed. A completed stream without a usage block yields nil so
+// the caller reports usage_unknown instead of a known zero.
+//
+// requireDone enables strict completion for limited invocations: content must
+// be followed by an explicit response.completed (or [DONE]). A generic EOF that
+// delivers partial content is an ambiguous truncation and never success.
+func parseResponsesStream(body io.Reader, emit func(string) error, requireDone bool) (*rawUsage, error) {
 	reader := bufio.NewScanner(io.LimitReader(body, (256<<10)+1))
 	reader.Buffer(make([]byte, 4096), 64<<10)
-	emitted := false
+	emitted, done := false, false
+	var usage *rawUsage
 	for reader.Scan() {
 		line := strings.TrimSpace(reader.Text())
 		if !strings.HasPrefix(line, "data:") {
@@ -219,32 +246,67 @@ func parseResponsesStream(body io.Reader, emit func(string) error) error {
 		}
 		value := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 		if value == "[DONE]" {
+			done = true
 			break
 		}
 		var event struct {
-			Type  string `json:"type"`
-			Delta string `json:"delta"`
+			Type     string `json:"type"`
+			Delta    string `json:"delta"`
+			Response struct {
+				Usage json.RawMessage `json:"usage"`
+			} `json:"response"`
+			Usage json.RawMessage `json:"usage"`
 		}
 		if json.Unmarshal([]byte(value), &event) != nil {
-			return ai.ErrFormat
+			return nil, ai.ErrFormat
 		}
-		if event.Type == "response.output_text.delta" && event.Delta != "" {
-			emitted = true
-			if err := emit(event.Delta); err != nil {
-				return err
+		switch event.Type {
+		case "response.output_text.delta":
+			if event.Delta != "" {
+				emitted = true
+				if err := emit(event.Delta); err != nil {
+					return nil, err
+				}
+			}
+		case "response.completed":
+			done = true
+			if len(event.Response.Usage) > 0 && string(event.Response.Usage) != "null" {
+				usage = parseRawUsage(event.Response.Usage)
+			} else if len(event.Usage) > 0 && string(event.Usage) != "null" {
+				usage = parseRawUsage(event.Usage)
 			}
 		}
 	}
 	if err := reader.Err(); err != nil {
-		return err
+		return nil, err
 	}
 	if !emitted {
-		return ai.ErrFormat
+		// Only a completed/responses-terminated empty stream is demonstrably
+		// empty. An ambiguous EOF must not trigger the fallback.
+		if done {
+			return nil, ai.ErrEmptyCompletion
+		}
+		return nil, ai.ErrFormat
 	}
-	return nil
+	if requireDone && !done {
+		// Content arrived but the provider never emitted response.completed;
+		// the stream was truncated after partial output. Never success.
+		return nil, ai.ErrTruncated
+	}
+	return usage, nil
 }
 
 func (c *Client) completeResponses(ctx context.Context, config ai.Config, payload map[string]any) (string, error) {
+	if err := reserveCompletion(ctx); err != nil {
+		return "", err
+	}
+	return c.doCompleteResponses(ctx, config, payload)
+}
+
+// doCompleteResponses performs one already-reserved /responses POST. It is the
+// compatibility target of the 404 fallback; the fallback reserves a fresh slot
+// through the completeResponses wrapper before reaching this function.
+func (c *Client) doCompleteResponses(ctx context.Context, config ai.Config, payload map[string]any) (string, error) {
 	messages, _ := payload["messages"].([]map[string]string)
 	body, _ := json.Marshal(map[string]any{"model": payload["model"], "stream": false, "input": messages})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(config.BaseURL, "/")+"/responses", bytes.NewReader(body))
@@ -281,9 +343,13 @@ func (c *Client) completeResponses(ctx context.Context, config ai.Config, payloa
 				Text string `json:"text"`
 			} `json:"content"`
 		} `json:"output"`
+		Usage json.RawMessage `json:"usage"`
 	}
 	if json.NewDecoder(io.LimitReader(response.Body, 256<<10)).Decode(&output) != nil {
 		return "", ai.ErrFormat
+	}
+	if err := reconcileUsage(ctx, parseRawUsage(output.Usage)); err != nil {
+		return "", err
 	}
 	if output.OutputText != "" {
 		return output.OutputText, nil
@@ -299,11 +365,21 @@ func (c *Client) completeResponses(ctx context.Context, config ai.Config, payloa
 }
 
 // parseStream is deliberately small and line-oriented: OpenAI-compatible
-// servers send one JSON object per data line and terminate with [DONE].
-func parseStream(body io.Reader, emit func(string) error) error {
+// servers send one JSON object per data line and terminate with [DONE]. It
+// returns the last observed usage block; absent usage yields nil.
+//
+// A chunk with an empty choices array is a legitimate usage-only envelope (sent
+// after the last content delta when streaming usage is requested); it updates
+// usage without content. Malformed chunks and multiple choices stay rejected.
+//
+// requireDone enables strict completion for limited invocations: content must
+// be followed by an explicit [DONE]. A generic EOF after content is ambiguous
+// truncation, never success, and must not hide a non-stream fallback.
+func parseStream(body io.Reader, emit func(string) error, requireDone bool) (*rawUsage, error) {
 	reader := bufio.NewScanner(io.LimitReader(body, (256<<10)+1))
 	reader.Buffer(make([]byte, 4096), 64<<10)
-	emitted := false
+	emitted, done := false, false
+	var usage *rawUsage
 	for reader.Scan() {
 		line := strings.TrimSpace(reader.Text())
 		if line == "" || strings.HasPrefix(line, ":") {
@@ -313,10 +389,8 @@ func parseStream(body io.Reader, emit func(string) error) error {
 			line = strings.TrimSpace(strings.TrimPrefix(line, "data:"))
 		}
 		if line == "[DONE]" {
-			if !emitted {
-				return ai.ErrFormat
-			}
-			return nil
+			done = true
+			break
 		}
 		var event struct {
 			Choices []struct {
@@ -325,24 +399,44 @@ func parseStream(body io.Reader, emit func(string) error) error {
 				} `json:"delta"`
 				FinishReason string `json:"finish_reason"`
 			} `json:"choices"`
+			Usage json.RawMessage `json:"usage"`
 		}
-		if json.Unmarshal([]byte(line), &event) != nil || len(event.Choices) != 1 {
-			return ai.ErrFormat
+		if json.Unmarshal([]byte(line), &event) != nil || len(event.Choices) > 1 {
+			return nil, ai.ErrFormat
+		}
+		if len(event.Usage) > 0 && string(event.Usage) != "null" {
+			usage = parseRawUsage(event.Usage)
+		}
+		if len(event.Choices) == 0 {
+			// Usage-only envelope: no content to emit. Without usage it carries
+			// no information and is only a harmless keep-alive-shaped chunk.
+			continue
 		}
 		if value := event.Choices[0].Delta.Content; value != "" {
 			emitted = true
 			if err := emit(value); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
 	if err := reader.Err(); err != nil {
-		return err
+		return nil, err
 	}
 	if !emitted {
-		return ai.ErrFormat
+		// A clean [DONE] with no content is demonstrably empty, so the bounded
+		// non-stream fallback is safe. EOF without [DONE] is an ambiguous
+		// truncation and must not trigger a fallback.
+		if done {
+			return nil, ai.ErrEmptyCompletion
+		}
+		return nil, ai.ErrFormat
 	}
-	return nil
+	if requireDone && !done {
+		// Content arrived but the provider closed the stream without [DONE];
+		// the response was truncated after partial output. Never success.
+		return nil, ai.ErrTruncated
+	}
+	return usage, nil
 }
 
 func New() *Client {
@@ -352,6 +446,16 @@ func New() *Client {
 }
 
 func (c *Client) complete(ctx context.Context, config ai.Config, payload map[string]any) (string, error) {
+	if err := reserveCompletion(ctx); err != nil {
+		return "", err
+	}
+	return c.doComplete(ctx, config, payload)
+}
+
+// doComplete performs one already-reserved /chat/completions POST. A 404 with
+// known /responses compatibility consumes a fresh reservation before the
+// compatible attempt; a blocked reservation reports budget exhaustion.
+func (c *Client) doComplete(ctx context.Context, config ai.Config, payload map[string]any) (string, error) {
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(config.BaseURL, "/")+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
@@ -419,6 +523,7 @@ func (c *Client) complete(ctx context.Context, config ai.Config, payload map[str
 			} `json:"message"`
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
+		Usage json.RawMessage `json:"usage"`
 	}
 	if json.Unmarshal(data, &envelope) != nil || len(envelope.Choices) != 1 {
 		return "", ai.ErrFormat
@@ -432,6 +537,9 @@ func (c *Client) complete(ctx context.Context, config ai.Config, payload map[str
 	}
 	if choice.FinishReason != "stop" {
 		return "", ai.ErrFormat
+	}
+	if err := reconcileUsage(ctx, parseRawUsage(envelope.Usage)); err != nil {
+		return "", err
 	}
 	return choice.Message.Content, nil
 }

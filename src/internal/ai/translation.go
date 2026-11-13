@@ -97,7 +97,10 @@ func (s *Service) Cached(ctx context.Context, key string) (Result, error) {
 	}
 	return result, err
 }
-func (s *Service) Translate(parent context.Context, in Input) (Result, error) {
+func (s *Service) Translate(parent context.Context, in Input) (result Result, retErr error) {
+	if !validBudgetLimit(in.MaxProviderCalls) {
+		return Result{}, ErrInvalid
+	}
 	if !validate(in) {
 		return Result{}, ErrInvalid
 	}
@@ -127,7 +130,12 @@ func (s *Service) Translate(parent context.Context, in Input) (Result, error) {
 		s.mu.Unlock()
 		return Result{}, ErrBusy
 	}
-	result := identity(in, c)
+	result = identity(in, c)
+	parent, err := withBudget(parent, in.MaxProviderCalls)
+	if err != nil {
+		s.mu.Unlock()
+		return Result{}, err
+	}
 	ctx, cancel := context.WithTimeout(parent, 45*time.Minute)
 	s.active = result.Key
 	s.cancel = cancel
@@ -140,6 +148,15 @@ func (s *Service) Translate(parent context.Context, in Input) (Result, error) {
 		s.cancel = nil
 		s.mu.Unlock()
 		s.wait.Done()
+		if retErr != nil {
+			SetOutcome(ctx, terminalOutcome(retErr))
+		}
+		if BudgetAttached(ctx) {
+			// Attach the report to any returned partial result so the HTTP layer
+			// can render limited progress and counters without losing the ledger
+			// state, including on error.
+			result.Budget = budgetReportFor(ctx)
+		}
 	}()
 	kind := translationKind(in)
 	if in.Regenerate {
@@ -157,6 +174,8 @@ func (s *Service) Translate(parent context.Context, in Input) (Result, error) {
 			return Result{}, err
 		}
 		if len(result.Texts) == result.Total {
+			SetOutcome(ctx, OutcomeCompleted)
+			result.Budget = budgetReportFor(ctx)
 			return result, nil
 		}
 	}
@@ -179,7 +198,7 @@ func (s *Service) Translate(parent context.Context, in Input) (Result, error) {
 	recoveryLimit, recoveryEnd := 0, 0
 	for len(result.Texts) < result.Total {
 		if err := ctx.Err(); err != nil {
-			return Result{}, err
+			return result, err
 		}
 		start := len(result.Texts)
 		end, size := start, 0
@@ -205,7 +224,7 @@ func (s *Service) Translate(parent context.Context, in Input) (Result, error) {
 		}
 		outputs, err := s.translateBatch(ctx, c, in, segments)
 		if ctx.Err() != nil {
-			return Result{}, ctx.Err()
+			return result, ctx.Err()
 		}
 		if err != nil {
 			if recoveryLimit == 0 && len(segments) >= 8 && (errors.Is(err, ErrIncomplete) || errors.Is(err, ErrTruncated)) {
@@ -213,26 +232,26 @@ func (s *Service) Translate(parent context.Context, in Input) (Result, error) {
 				recoveryEnd = end
 				continue
 			}
-			return Result{}, err
+			return result, err
 		}
 		if len(outputs) != len(segments) {
-			return Result{}, ErrFormat
+			return result, ErrFormat
 		}
 		texts := make([]string, len(segments))
 		seen := make(map[int]bool, len(segments))
 		for _, out := range outputs {
 			if out.Index < start || out.Index >= end || seen[out.Index] || !utf8.ValidString(out.Text) || len(out.Text) > 24000 || strings.TrimSpace(out.Text) == "" {
-				return Result{}, ErrFormat
+				return result, ErrFormat
 			}
 			converted := strings.TrimSpace(out.Text)
 			if converter != nil {
 				converted, err = converter.Convert(converted)
 				if err != nil {
-					return Result{}, ErrFormat
+					return result, ErrFormat
 				}
 			}
 			if len(converted) > 24000 {
-				return Result{}, ErrFormat
+				return result, ErrFormat
 			}
 			seen[out.Index] = true
 			texts[out.Index-start] = converted
@@ -245,16 +264,18 @@ func (s *Service) Translate(parent context.Context, in Input) (Result, error) {
 			total += len(text)
 		}
 		if total > 8<<20 {
-			return Result{}, ErrFormat
+			return result, ErrFormat
 		}
 		if ctx.Err() != nil {
-			return Result{}, ctx.Err()
+			return result, ctx.Err()
 		}
 		if err := s.write(ctx, kind, candidate); err != nil {
-			return Result{}, err
+			return result, err
 		}
 		result = candidate
 	}
+	SetOutcome(ctx, OutcomeCompleted)
+	result.Budget = budgetReportFor(ctx)
 	return result, nil
 }
 

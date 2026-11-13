@@ -91,7 +91,10 @@ func cleanSummaryDraftPrefix(value string) string {
 // SummaryGenerate coordinates one resumable summary operation. Cache encoding
 // and migration stay behind summaryStore; this file only owns provider calls,
 // checkpoints and reduction order.
-func (s *Service) SummaryGenerate(parent context.Context, in SummaryInput) (SummaryResult, error) {
+func (s *Service) SummaryGenerate(parent context.Context, in SummaryInput) (result SummaryResult, retErr error) {
+	if !validBudgetLimit(in.MaxProviderCalls) {
+		return SummaryResult{}, ErrInvalid
+	}
 	segments, err := normalizeSummaryInput(in)
 	if err != nil {
 		return SummaryResult{}, err
@@ -120,11 +123,19 @@ func (s *Service) SummaryGenerate(parent context.Context, in SummaryInput) (Summ
 	c = summaryConfig(c)
 	key := summaryKey(in, segments, SummaryCacheSystemPrompt(c), summaryBudgetKey(c.SummaryContextBudget), SummaryCacheUserPrompt(c))
 	groups, totalCalls := summaryPlan(segments, summaryContextBudget(c.SummaryContextBudget))
+	parent, err = withBudget(parent, in.MaxProviderCalls)
+	if err != nil {
+		s.mu.Unlock()
+		return SummaryResult{}, err
+	}
 	ctx, cancel := context.WithTimeout(parent, 45*time.Minute)
 	s.active = "summary:" + key
 	s.cancel = cancel
 	s.wait.Add(1)
 	s.mu.Unlock()
+	sectionCount := summarySectionCount(segments, in.Source, groups)
+	fresh := summaryCache{Result: SummaryResult{Key: key, ContentID: in.ContentID, Source: in.Source, BaseURL: c.BaseURL, Model: c.Model, TotalCalls: totalCalls, FormatVersion: summaryFormatVersion, Progress: SummaryProgress{TotalCalls: totalCalls, TotalSections: sectionCount}}, Current: []SummaryDraft{}}
+	cache := fresh
 	defer func() {
 		cancel()
 		s.mu.Lock()
@@ -132,10 +143,18 @@ func (s *Service) SummaryGenerate(parent context.Context, in SummaryInput) (Summ
 		s.cancel = nil
 		s.mu.Unlock()
 		s.wait.Done()
+		if retErr != nil {
+			// Classify the terminal outcome BEFORE snapshotting the returned
+			// budget in the same LIFO frame. A provider failure under any limit
+			// must report provider_error, not active or budget_exhausted, and
+			// never a fake known-zero token count. The partial checkpoint stays.
+			SetOutcome(ctx, terminalOutcome(retErr))
+			if BudgetAttached(ctx) {
+				result = cache.Result
+				result.Budget = budgetReportFor(ctx)
+			}
+		}
 	}()
-	sectionCount := summarySectionCount(segments, in.Source, groups)
-	fresh := summaryCache{Result: SummaryResult{Key: key, ContentID: in.ContentID, Source: in.Source, BaseURL: c.BaseURL, Model: c.Model, TotalCalls: totalCalls, FormatVersion: summaryFormatVersion, Progress: SummaryProgress{TotalCalls: totalCalls, TotalSections: sectionCount}}, Current: []SummaryDraft{}}
-	cache := fresh
 	if in.Regenerate {
 		if err := s.results.DeleteAIResult(ctx, kindSummary, key, targetChinese); err != nil {
 			return SummaryResult{}, ErrStorage
@@ -165,6 +184,8 @@ func (s *Service) SummaryGenerate(parent context.Context, in SummaryInput) (Summ
 		if err := s.applySummaryTitleOverrides(ctx, &cache.Result); err != nil {
 			return SummaryResult{}, err
 		}
+		SetOutcome(ctx, OutcomeCompleted)
+		cache.Result.Budget = budgetReportFor(ctx)
 		return cache.Result, nil
 	}
 	cache.Result.BaseURL, cache.Result.Model = c.BaseURL, c.Model
@@ -201,6 +222,8 @@ func (s *Service) SummaryGenerate(parent context.Context, in SummaryInput) (Summ
 			if writer != nil {
 				_ = writer(ctx, cache.Result)
 			}
+			SetOutcome(ctx, OutcomeCompleted)
+			cache.Result.Budget = budgetReportFor(ctx)
 			return cache.Result, nil
 		}
 	}
@@ -248,6 +271,8 @@ func (s *Service) SummaryGenerate(parent context.Context, in SummaryInput) (Summ
 	if writer != nil {
 		_ = writer(ctx, cache.Result)
 	}
+	SetOutcome(ctx, OutcomeCompleted)
+	cache.Result.Budget = budgetReportFor(ctx)
 	return cache.Result, nil
 }
 

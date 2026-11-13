@@ -1,6 +1,8 @@
 package httptransport
 
 import (
+	"context"
+	"errors"
 	"net/http"
 
 	"tangentry/internal/ai"
@@ -55,10 +57,15 @@ func (h *aiHandler) aiCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	result, err := h.ai.AI.Check(r.Context(), input)
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return
+		}
 		if input.Task == "summary" {
-			summaryFail(w, err)
+			status, body := classifySummaryError(err)
+			writeAIBudgetError(w, status, body, result.Budget, nil)
 		} else {
-			aiFail(w, err)
+			status, body := classifyAIError(err)
+			writeAIBudgetError(w, status, body, result.Budget, nil)
 		}
 		return
 	}
