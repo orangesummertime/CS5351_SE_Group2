@@ -55,7 +55,8 @@ FR-02 交付的是**选片段**，FR-03 交付的是**回答引用核验**，FR-
 
 ### A：基线、共享预算与集成
 
-- [x] 汇集原版测试记录与 provider 调用链，准备 [A 的实施／测试计划](docs/plans/a-budget-preimplementation.md)、[候选 ADR](docs/architecture/adr/001-provider-call-budget.md) 和 [需求草案](docs/req/requirements.yaml)；这些材料仍待本仓库的独立审查，预算代码尚未实现。
+- [x] 汇集原版测试记录与 provider 调用链，准备 [A 的实施／测试计划](docs/plans/a-budget-preimplementation.md)、[候选 ADR](docs/architecture/adr/001-provider-call-budget.md) 和 [需求草案](docs/req/requirements.yaml)；设计已在 PR #1 获独立审查，预算代码尚未实现。
+- [x] 按审查方案实测两家 provider 的非流式与流式用量字段；见 [A 的真实测量结果](docs/evidence/a-live-usage-presence.md)。结果仍需组员审查后才能开始实现。
 - [ ] 明确一次 AI 任务的边界、可计量指标、并发预留、未知用量及中途取消策略，并写成需求与 ADR。
 - [ ] 设计预算在 AI 服务与 provider 适配器之间的接口，覆盖问答及本项目新增调用，不把客户端显示值当作权威计量。
 - [ ] 用固定响应测试正常、超限、用量缺失、重试和并发场景；验证停止后不再启动不允许的新调用。

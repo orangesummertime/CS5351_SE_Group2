@@ -9,5 +9,7 @@ Records start with this fork's first group commit. Each entry states the actual 
 | [003](003-two-provider-protocol.md) | `docs: scope usage measurement to two providers` | Kefan CHEN | A measurement protocol scope |
 | [004](004-owner-a-review-response.md) | `docs: address owner A review findings` | Kefan CHEN | Invariants, streaming design, test plan, review response |
 | [005](005-owner-a-follow-up.md) | `docs: reconcile main and review follow-ups` | Kefan CHEN | Main synchronization and non-blocking review follow-ups |
+| [006](006-owner-a-live-measurement.md) | `docs: record owner A live usage measurement` | Kefan CHEN | Two-provider evidence, neutral test fixture, and A review gate |
+| [007](007-owner-a-adr-alignment.md) | `docs: align A decision record with live evidence` | Kefan CHEN | ADR status, streaming evidence, and review gate |
 
 The upstream history predates this group record and is not reconstructed here.
