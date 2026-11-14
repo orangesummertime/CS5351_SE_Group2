@@ -257,3 +257,50 @@ load/split → lexical → sweep → embed → dedupe/verify.
 - Selector-level vector-cache wiring (per-passage keys) lands in Phase 5; the
   cache port + both implementations + unit tests are complete here.
 - Cloud embedding requires an explicit provider switch (local-first default).
+
+## Phase 5 — AI service + transport integration (2026-11-14)
+
+### What changed
+
+- **Wire object** (`retrieval/wire.go`): namespaced `Request`/`Response`/
+  `PassageRef`/`EmbeddingSummary`/`RerankSummary` (schemaVersion 1) and a
+  `StatusError` carrying a distinct retrieval status.
+- **Engine** (`retrieval/engine.go`): `Run` orchestrates validate budgets →
+  preflight → select → assemble → wire response, with a budget-counting
+  embedder wrapper; returns the assembled six-layer context + response, or a
+  StatusError (zero chat) on rejection.
+- **AI service** (`ai/chat.go`, `translation_types.go`): `ChatRequest.Retrieval`
+  / `ChatResult.Retrieval` (omitempty); optional `SetRetrievalEngine` (legacy
+  path unchanged when unset); when enabled, runs the engine before any chat
+  POST, ignores the client context, uses the assembled context as the system
+  message source, and attaches the response. Rejections return zero chat POST.
+- **Transport** (`http/ai_retrieval.go`, `ai_summary.go`): each status maps to
+  a distinct HTTP status/code/copy; SSE rejection emits a terminal data frame
+  with the retrieval object and never `event: done`; unknown retrieval fields
+  rejected by the strict decoder.
+- **Composition root** (`app/wire_services.go`, `feature_services.go`): wires
+  the engine (SQLite source, local-first embedder, process-local cache).
+
+### Verification (test-first; raw logs retained)
+
+- B-T01 retrieval-off golden (byte-identical context, unchanged field set,
+  selector/embedder never called); B-T05 no_match zero chat; B-T07 injection
+  is data; B-T09 invalid inputs zero POST; B-T17 byte cap; B-T25 HTTP/SSE
+  mapping (12 statuses), no-done-on-rejection, sweep-limited != no_match,
+  unknown-field rejection.
+- B-T11 regression: full Go suite 45 ok / 11 no-test, frontend 62 files / 251
+  tests, all green.
+- Gates: focused exit 0 (`b-impl-phase5-focused.log`); full exit 0
+  (`b-impl-phase5-go-full.log`); layering + vet + gofmt + A-budget empty diff
+  (`b-impl-phase5-layering.log`); frontend (`b-impl-phase5-web.log`);
+  two-run determinism identical (`b-impl-phase5-determinism.log`).
+- Phase report: `docs/evidence/b-impl-phase5-report.md`.
+
+### Limits
+
+- Rerank-in-selector scoring is not wired (rerank off by default; the adapter
+  is tested in Phase 4); the response reports rerank disabled.
+- The Engine uses fixed topK=100/batch=8 defaults from the request; full
+  settings-driven selector config (weights/topK from saved settings) is a
+  refinement for the frontend phase.
+- No real provider call; fake provider/source/embedder and fake AIService.

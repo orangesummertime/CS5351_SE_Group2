@@ -137,6 +137,7 @@ func wireFeatures(dataDir string, configuration config.Config, option Options, r
 	noteService := notes.NewService(store)
 	languageAI := newLanguageAI(dataDir, store, option)
 	if languageAI != nil {
+		languageAI.SetRetrievalEngine(newRetrievalEngine(store))
 		languageAI.SetSummaryNoteWriter(func(ctx context.Context, result ai.SummaryResult) error {
 			body := summaryNoteBody(result)
 			createID := summaryNoteID(result.ContentID)

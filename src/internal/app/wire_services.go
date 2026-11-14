@@ -8,11 +8,13 @@ import (
 
 	"tangentry/internal/adapters/aichat"
 	"tangentry/internal/adapters/filesystem"
+	"tangentry/internal/adapters/sqlite"
 	"tangentry/internal/adapters/tools"
 	"tangentry/internal/ai"
 	"tangentry/internal/config"
 	"tangentry/internal/discovery"
 	"tangentry/internal/playback"
+	"tangentry/internal/retrieval"
 	"tangentry/internal/subtitles"
 	"tangentry/internal/transcription"
 )
@@ -74,6 +76,23 @@ func newLanguageAI(dataDir string, results ai.ResultStore, option Options) *ai.S
 		return nil
 	}
 	return languageAI
+}
+
+// newRetrievalEngine wires B's retrieval engine: the SQLite passage source,
+// the configured embedding adapter (local-first; nil if settings invalid →
+// lexical-only), a process-local vector cache (default) and the assembler.
+// The persistent SQLite cache (migration 083) is available as an opt-in.
+func newRetrievalEngine(store *sqlite.Store) *retrieval.Engine {
+	source := sqlite.NewRetrievalSource(store)
+	settings, err := store.LoadRetrievalSettings(context.Background())
+	if err != nil {
+		settings = retrieval.DefaultEmbeddingSettings()
+	}
+	var embedder retrieval.Embedder
+	if retrieval.ValidateEmbeddingSettings(settings) == nil {
+		embedder = aichat.NewEmbeddingClient(settings, nil, retrieval.NewProcessVectorCache())
+	}
+	return &retrieval.Engine{Source: source, Embedder: embedder, Assembler: retrieval.NewContextAssembler()}
 }
 
 // newCompatibility converts online videos the web view cannot play; it is optional.

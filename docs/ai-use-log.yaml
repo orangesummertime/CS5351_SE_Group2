@@ -811,3 +811,67 @@ entries:
       Phase 5. Migrations 083/085 are additive/idempotent; no published
       migration edited. Implementation acceptance and APPROVE remain human
       non-author actions.
+  - id: B-AI-013
+    date: "2026-11-14"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Implementation Phase 5 (AI service + transport integration) for FR-02,
+      NFR-02, INV-04, INV-05 on owner/b-implementation, after the human
+      confirmed Phase 4. Test-first: wrote B-T01 (retrieval-off golden),
+      B-T05 (no_match zero chat), B-T07 (injection is data), B-T09 (invalid
+      inputs), B-T17 (byte cap), B-T25 (HTTP/SSE status mapping, no done on
+      rejection, sweep-limited != no_match, unknown-field rejection) and
+      relied on B-T11 full-suite regression, then integrated the namespaced
+      retrieval object into the chat request/response, the retrieval Engine
+      (validate -> preflight -> select -> assemble -> wire response) into the
+      AI service via an optional setter, the status -> HTTP/SSE mapping into
+      the transport, and wired the engine at the composition root.
+    scope:
+      read:
+        - "docs/architecture/adr/002-question-relevant-retrieval.md (wire envelope, six-layer assembly, invariants), docs/plans/b-retrieval-preimplementation.md (integration point, status mapping), docs/req/requirements.yaml (AC-FR-02-1/4/6/8, AC-INV-04-3)"
+        - "src/internal/ai/chat.go, translation_types.go, translation.go (chat flow, Service, constructor); src/internal/transport/http/ai_summary.go, ai_errors.go, ai_common.go, ports_ai.go, dependencies.go (handler, decoder, error mapping); src/internal/app/feature_services.go, wire_services.go (composition root)"
+      wrote:
+        - "src/internal/retrieval/wire.go (Request/Response/PassageRef/StatusError), engine.go (Engine.Run, budgetedEmbedder, LastUserQuestion)"
+        - "src/internal/ai/translation_types.go (ChatRequest.Retrieval, ChatResult.Retrieval, Service.retrievalEngine + SetRetrievalEngine), chat.go (retrieval branch, ignore client context, source replacement)"
+        - "src/internal/transport/http/ai_retrieval.go (+ ai_retrieval_test.go) status mapping; ai_summary.go (handler + SSE terminal retrieval frames)"
+        - "src/internal/app/wire_services.go (newRetrievalEngine), feature_services.go (SetRetrievalEngine wiring)"
+        - "src/internal/ai/chat_retrieval_test.go (B-T01/05/07/09/17 + assembled-context test)"
+        - "docs/evidence/b-impl-phase5-focused.log, b-impl-phase5-go-full.log, b-impl-phase5-layering.log, b-impl-phase5-web.log, b-impl-phase5-determinism.log, b-impl-phase5-report.md"
+        - "docs/ai-use-log.yaml (this entry)"
+        - "contributions/013-owner-b-implementation.md (Phase 5 section)"
+        - "owner-local, not committed: docs/transcripts/owner-b/2026-11-14-phase5-integration.json, README.md (new index row)"
+      executed:
+        - "go test focused (retrieval/ai/transport) -count=1 (exit 0)"
+        - "go test ./... -count=1 (45 ok / 11 no-test, exit 0) — B-T11 regression incl. retrieval-off golden"
+        - "go test ./internal/layering -count=1 (exit 0); go vet (exit 0); gofmt clean"
+        - "npm --prefix src/web test -- --run (62 files / 251 tests, exit 0); npm --prefix src/web run build (exit 0)"
+        - "two-run determinism diff identical (exit 0, 10 PASS/run); git diff main A-budget + protocol.go empty"
+        - "git commit (phase 5); no push in this session"
+        - "Read-only export of this session via src/build/sexport at phase end (after the commit); sha256 recorded in the local README"
+    network_writes: []
+    original_session_id: ses_e27efbad7ffeY2pIG6EzRIOgOQ
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-14-phase5-integration.json
+      (raw OpenCode session export retained outside git; one continuous
+      session with B-AI-008..012, captured at phase end after the commit; can
+      be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: true
+    notes: >-
+      No real provider, credential or network endpoint was used; AI-service
+      tests use a counting fake provider and fake passage source/embedder,
+      and transport tests use a fake AIService. The retrieval-off legacy path
+      is byte-identical (B-T01: provider receives the client context verbatim,
+      response field set unchanged, selector/embedder never called). The
+      retrieval branch runs only when enabled; rejections return zero chat
+      POST and a distinct status (B-T25), and a rejected SSE assembly never
+      emits event: done. ai imports retrieval (domain->domain, no cycle);
+      retrieval still imports only stdlib. A's budget.go/ledger.go/
+      protocol.go remain byte-identical to main. The composition root wires
+      the engine with the local-first default embedder (process-local cache);
+      a missing local server degrades to lexical_only at call time. No
+      migration added this phase. Implementation acceptance and APPROVE
+      remain human non-author actions.
