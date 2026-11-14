@@ -935,3 +935,106 @@ entries:
       guard. pdf.js remains display-only (unchanged). No backend code changed
       this phase; A's budget files remain byte-identical to main.
       Implementation acceptance and APPROVE remain human non-author actions.
+  - id: B-AI-014
+    date: "2026-11-14"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Draft the Phase-7 evaluation set for NFR-02 at the user's explicit
+      request ("phase07需要一个评估集，你可以自拟一个评估集吗？"). The protocol
+      reserves label approval to a human, so the set is marked
+      draft-pending-human-confirmation on every record and must not be used
+      for the NFR-02 claim until WANG Jiaqi confirms each label.
+    scope:
+      read:
+        - "docs/evidence/b-eval-protocol.md (dataset requirements, gold format, determinism, decision rule)"
+        - "owner-b-implementation-prompt.md (Phase 7 precondition)"
+        - "src/internal/retrieval/{split,normalize,lexical,sweep,selector,budget,identity,version,verify,types,ports}.go, src/web/src/features/ai/chatContext.ts (baseline), src/internal/retrieval/fixtures_test.go (fixture patterns)"
+      wrote:
+        - "test/offline/eval-b/gen/{go.mod,main.go} (deterministic generator; module tangentry/eval-b-gen with replace to src; uses the real retrieval splitter/grouping and validates every gold through retrieval.NewSelector)"
+        - "test/offline/eval-b/questions.yaml (24 primary + 2 provisional OCR gold records, protocol §3 format, annotator=AI draft UNCONFIRMED)"
+        - "test/offline/eval-b/fixtures/*.json (7 document snapshots + 3 negative fixtures), *.txt canonical baseline-replay texts, subtitle-lecture.srt"
+        - "test/offline/eval-b/dataset-manifest.json (hashes, rune counts, candidate counts, sweep sample indices/stride/coverage, per-question position/lexical/baseline/reachability flags)"
+        - "test/offline/eval-b/{README.md,eval-configs.yaml,negative-cases.yaml,verify_eval_set.py}"
+        - "test/offline/README.md (eval-b pointer); docs/ai-use-log.yaml (this entry)"
+      executed:
+        - "go run . -out .. (generator; all invariants asserted; exit 0)"
+        - "two-run determinism: sha256 of questions.yaml + manifest + all fixtures byte-identical (diff exit 0)"
+        - "python3 test/offline/eval-b/verify_eval_set.py (independent second implementation, 695 checks, exit 0)"
+    network_writes: []
+    transcript: "pending export (this session); to be retained owner-local per the shared convention"
+    transcript_status: "pending"
+    human_review: "pending"
+    generated_code: true
+    notes: >-
+      No provider, credential, network or browser was used; the generator is
+      offline and deterministic (no clock, no randomness). All documents are
+      fictional constructed templates, BMP-only, no real user data. Gold
+      granularity is guaranteed by calling the real retrieval
+      SplitSentences/GroupSegments/GroupCueSegments and by validating every
+      gold through the real selector pipeline (exact-phrase locator proof,
+      lexical reachability, fake-marker sweep reachability, candidate-count
+      cross-check via Sweep.Stride/Coverage). Fake vectors were used ONLY for
+      fixture-property validation during generation, never for an NFR-02
+      measurement. Known design points: BQ-021 is an intentional
+      coverage-limited miss (gold off every sampled sweep index) and stays in
+      the denominator; BQ-016 exposes the single-term proximity artifact
+      (lexical-only miss, hybrid reaches it via sampled index 0); the OCR
+      subset (BQ-025/026) is provisional expected-text and stays out of the
+      primary denominator until a real local PaddleOCR run verifies it.
+      Label confirmation, set freezing and the Phase-7 run remain human
+      non-author actions.
+  - id: B-AI-015
+    date: "2026-11-14"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Implementation Phase 7 (evaluation replay) for NFR-02 after the human
+      confirmed the AI-drafted evaluation set in session ("我是人类，我签署。
+      请你进入phase07") and separately authorized ONE live embedding pass
+      (protocol §9). Recorded the sign-off, froze the set (hashes), built the
+      offline replay harness (baseline vs lexical-only vs hybrid at 120k and
+      8k, budget-invariant runs, negative set, B-T12 double-run), generated
+      frozen vectors through the real aichat.EmbeddingClient adapter, ran the
+      evaluation and the B-T12/B-T13/B-T18 acceptance tests, and produced
+      docs/evidence/b-eval-report.md. NFR-02 decision rule: all PASS
+      (hybrid-split 23/24 = 0.9583).
+    scope:
+      read:
+        - "docs/evidence/b-eval-protocol.md, docs/plans/b-retrieval-preimplementation.md (B-T12/13/18), owner-b-implementation-prompt.md (Phase 7)"
+        - "src/internal/retrieval/{selector,assemble,budget,verify,embedding_settings,embedding_budget}.go, src/internal/adapters/aichat/embedding.go (real adapter used by vectorgen)"
+      wrote:
+        - "test/offline/eval-b/questions.yaml + dataset-manifest.json (status confirmed, annotator WANG Jiaqi, freeze-hashes.txt)"
+        - "test/offline/eval-b/{evalutil,replay,vectorgen,report}/ (harness; module tangentry/eval-b-gen), go.mod/go.sum"
+        - "test/offline/eval-b/vectors/{frozen-vectors.json,generation-log.json}, runs/*.json; docs/evidence/b-impl-phase7-vectorgen.log (live pass stdout)"
+        - "test/offline/eval-b/{README.md,eval-configs.yaml,negative-cases.yaml,verify_eval_set.py} (confirmation + deviation records)"
+        - "docs/evidence/b-eval-report.md, b-eval-per-question.json, b-impl-phase7-report.md, b-impl-phase7-replay.log, b-impl-phase7-eval-tests.log, b-impl-phase7-go-full.log"
+        - "contributions/013-owner-b-implementation.md (Phase 7 section); docs/ai-use-log.yaml (this entry)"
+      executed:
+        - "go run ./vectorgen -authorize <human statement> -spend-cap-cny 10 (ONE live pass: Bailian DashScope text-embedding-v4, 1024 dims, batch 8, split text_type; 740 requests, 544390 tokens, 0 errors; key read at runtime from ~/.bailian/config.json, never written to disk/logs)"
+        - "go run ./replay -eval . -out runs (offline; two runs byte-identical; negatives 12/12)"
+        - "go test ./replay -count=1 -v (B-T12/B-T13/B-T18 + negatives + budget invariants, exit 0)"
+        - "go test ./... -count=1 in src (46 ok / 11 no-test, exit 0) + layering (exit 0)"
+        - "python3 verify_eval_set.py (696 checks, exit 0); go run ./report (b-eval-report.md)"
+    network_writes:
+      - "Aliyun Bailian DashScope text-embedding API (dashscope.aliyuncs.com): 740 embedding POSTs, explicitly authorized by the human in session with spend cap CNY 10; actual usage 544390 tokens (~CNY 0.27); per-request text_type/status/usage ledger in vectors/generation-log.json; API key redacted everywhere; no other network use"
+    transcript: "pending export (this session); to be retained owner-local per the shared convention"
+    transcript_status: "pending"
+    human_review: "pending"
+    generated_code: true
+    notes: >-
+      The evaluation set was AI-drafted (B-AI-014) and human-confirmed BEFORE
+      any run; freeze hashes recorded; no gold label changed after seeing
+      results and no question dropped. The only hybrid miss (BQ-021) is the
+      intentional coverage-limited fixture and stays in the denominator.
+      Recorded deviation: Bailian text-embedding-v4 replaces the local-first
+      bge-m3 default (no local server/model in this environment); hybrid-shared
+      is a labeled simulation, hybrid-split carries the NFR-02 decision. OCR
+      subset excluded (PaddleOCR unavailable) and reported as
+      pdf_ocr_unavailable. Replay is zero-network and deterministic (B-T12
+      sha256 recorded); fake vectors were used only for pre-run fixture
+      validation, never for the claim. No src/ implementation code changed;
+      A's budget files untouched. PR + non-author review remain human actions;
+      no push in this session.

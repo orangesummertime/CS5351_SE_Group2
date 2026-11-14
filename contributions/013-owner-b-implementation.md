@@ -344,3 +344,59 @@ load/split → lexical → sweep → embed → dedupe/verify.
   and tested).
 - No browser/E2E run (node-environment vitest + renderToStaticMarkup only).
 - Phase 7 evaluation still waits for WANG Jiaqi's gold-labeled set.
+## Phase 7 — evaluation replay (2026-11-14)
+
+### What changed
+
+- **Evaluation set** (`test/offline/eval-b/`): AI-drafted at the user's
+  request (B-AI-014), then **human-confirmed and frozen** (WANG Jiaqi
+  sign-off in session, 2026-11-14; freeze hashes recorded). 24 primary
+  answerable questions + 2 provisional OCR questions across 7 fictional
+  documents (article / saved subtitle / PDF page text; 141k–165k runes each,
+  BMP-only): middle-third golds + head/tail controls, heading trap, repeated
+  sentence/cue, same-language and cross-language zero-overlap paraphrases
+  (B-T39), two distractor-saturated documents with gold on/off the sampled
+  sweep index (B-T40), sweep-clamp and character-bound fixtures, plus a
+  12-case negative set. Gold granularity uses the REAL retrieval
+  splitter/grouping; every gold was validated through `retrieval.NewSelector`
+  before the run; an independent Python cross-validator re-checks 696 items.
+- **Replay harness** (`evalutil/`, `replay/`, `vectorgen/`, `report/`):
+  baseline (`buildChatContext` head/tail) vs lexical-only vs hybrid at 120k
+  AND 8k (never pooled), budget-invariant runs (starved / char-bound /
+  high-budget × shared/split), negative set, and B-T12 double-run.
+  `vectorgen` is the ONE live pass (protocol §9 gate: refuses without
+  `-authorize`), through the real `aichat.EmbeddingClient`; the key is read
+  at runtime and never written to any file or log.
+
+### Verification (raw logs retained)
+
+- **NFR-02: PASS** — hybrid-split 120k **23/24 = 0.9583** (≥0.80, ≥ baseline
+  0.2500, ≥ lexical-only 0.7917); 8k 23/24 with explicit `degraded_budget`;
+  the only miss (BQ-021) is the intentional coverage-limited outcome and
+  stays in the denominator. Zero-overlap paraphrases and the on-sample
+  distractor gold all hit via the bounded sweep at recorded coverage.
+- B-T12 (byte-identical frozen replay), B-T13 (threshold + comparisons),
+  B-T18 (8k stress), negative set 12/12, budget invariants in all 6 configs:
+  `go test ./replay -count=1` exit 0 (`b-impl-phase7-eval-tests.log`).
+- Go regression 46 ok / 11 no-test + layering exit 0
+  (`b-impl-phase7-go-full.log`); no `src/` implementation change this phase.
+- Live pass (explicitly authorized): Bailian DashScope `text-embedding-v4`,
+  1024 dims, split text_type; 740 requests, 544,390 tokens (≈ CNY 0.27, cap
+  CNY 10), 0 errors; vectors frozen with payload hash; replays zero-network.
+- Report: `docs/evidence/b-eval-report.md` (+ `b-eval-per-question.json`,
+  192 records with full selected passage IDs); phase report:
+  `docs/evidence/b-impl-phase7-report.md`.
+
+### Limits
+
+- Recorded deviation: no local embedding server/model exists in this
+  environment, so the authorized Bailian provider replaces the local-first
+  default; `hybrid-shared` is a labeled simulation, `hybrid-split` carries
+  the decision. A pinned-local bge-m3 rerun remains an optional follow-up.
+- OCR subset (BQ-025/026) not evaluated: local PaddleOCR runtime unavailable
+  (`pdf_ocr_unavailable`); provisional expected-text fixture stays gated and
+  out of the primary denominator.
+- This is sentence/segment recall, not answer correctness; C's citation
+  verification and D's comparison quality are separate.
+- PR `owner/b-implementation → main` + non-author human review remain the
+  next human actions; no push in this session.
