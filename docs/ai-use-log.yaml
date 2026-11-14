@@ -612,3 +612,68 @@ entries:
       report (shared R=25 cold-cache 24 not 25; trailing emoji sentence;
       degraded-profile history disabled at 8k). Implementation acceptance
       and APPROVE remain human non-author actions.
+  - id: B-AI-010
+    date: "2026-11-14"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Implementation Phase 2 (source loading and content version) for FR-02,
+      NFR-02, INV-04, INV-05 on owner/b-implementation, after the human
+      confirmed Phase 1. Test-first: wrote B-T03 (subtitle middle cue),
+      B-T19 storage half (stale after update), B-T28 revision part
+      (revision invalidation) and B-T38 (content-revision migration/backfill/
+      idempotency/single-owner) plus domain snapshot-hash/range tests,
+      recorded the red run, then implemented migration 084
+      (content_revision + content_hash with legacy backfill), the
+      retrieval.PassageSource SQLite adapter, normalized snapshot hashing,
+      and exposed the version fields in content.Item and the library API.
+    scope:
+      read:
+        - "docs/architecture/adr/002-question-relevant-retrieval.md (Content version), docs/plans/b-retrieval-preimplementation.md (Content revision, Migration coordination), docs/req/requirements.yaml (AC-INV-05-3/4, AC-FR-02-3), docs/evidence/b-baseline.md (B-BASE-02 fixture)"
+        - "src/internal/adapters/sqlite/store.go, migrations.go, library.go, saved_subtitles.go, article_previews.go, migrations_test.go, progress_test.go, subscriptions_test.go; src/internal/content/content.go, content_types.go, content_projection.go, identity.go; src/internal/subtitles/saved.go, subtitles.go; src/internal/transport/http/library.go"
+      wrote:
+        - "src/internal/retrieval/snapshot_hash.go + snapshot_hash_test.go (SnapshotHash, SnapshotRange)"
+        - "src/internal/content/content_types.go (ContentRevision/ContentHash fields, server-owned, omitempty)"
+        - "src/internal/adapters/sqlite/migrations/084_content_revision.sql (new; B-owned column set)"
+        - "src/internal/adapters/sqlite/content_version.go + content_version_test.go (itemSnapshot, addContentVersion backfill step)"
+        - "src/internal/adapters/sqlite/retrieval_source.go + retrieval_source_test.go (PassageSource adapter)"
+        - "src/internal/adapters/sqlite/migrations.go (register step 84), store.go (Save/Get/List version columns), library.go (Page version columns)"
+        - "src/internal/adapters/sqlite/progress_test.go, subscriptions_test.go (assert backfill then compare original fields; no assertion weakened)"
+        - "docs/evidence/b-impl-phase2-red.log, b-impl-phase2-focused.log, b-impl-phase2-go-full.log, b-impl-phase2-layering.log, b-impl-phase2-web.log, b-impl-phase2-tests.log, b-impl-phase2-determinism.log, b-impl-phase2-report.md"
+        - "docs/ai-use-log.yaml (this entry)"
+        - "contributions/013-owner-b-implementation.md (Phase 2 section)"
+        - "owner-local, not committed: docs/transcripts/owner-b/2026-11-14-phase2-source-version.json, README.md (new index row)"
+      executed:
+        - "go test ./internal/retrieval/ ./internal/adapters/sqlite/ -count=1: first run red (missing fields/functions + 3 existing-test expectations), then green"
+        - "go test ./internal/retrieval/... ./internal/ai/... ./internal/transport/http/... -count=1 (exit 0)"
+        - "go test ./... -count=1 (44 ok / 11 no-test, exit 0)"
+        - "go test ./internal/layering -count=1 (exit 0); go vet retrieval/sqlite/content (exit 0); gofmt clean"
+        - "npm --prefix src/web test -- --run (62 files / 251 tests, exit 0); npm --prefix src/web run build (exit 0)"
+        - "two-run determinism diff identical (exit 0); git diff main A-budget empty; published migrations unchanged (only 084 added)"
+        - "git commit (phase 2); no push in this session"
+        - "Read-only export of this session via src/build/sexport at phase end (after the commit); sha256 recorded in the local README"
+    network_writes: []
+    original_session_id: ses_e27efbad7ffeY2pIG6EzRIOgOQ
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-14-phase2-source-version.json
+      (raw OpenCode session export retained outside git; one continuous
+      session with B-AI-008/009, captured at phase end after the commit; can
+      be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: true
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted; no browser; no network writes. All tests use temporary
+      SQLite fixtures, fixed synthetic subtitle/article data and pure
+      functions; no real credentials or user data. Migration 084 is additive
+      and idempotent (pragma-checked columns, backfill only empty hashes);
+      no published migration was edited. content_revision/content_hash are
+      server-owned (client values ignored, never embedded in the payload).
+      Two existing upgrade tests were updated to assert the new backfill
+      fields explicitly and then compare every original field unchanged; the
+      library card projection now exposes the version fields consistently.
+      Subtitle cue IDs are deterministic language-qualified indices (saved
+      cues have no database ID). Implementation acceptance and APPROVE remain
+      human non-author actions.

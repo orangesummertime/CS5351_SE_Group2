@@ -102,3 +102,52 @@ load/split → lexical → sweep → embed → dedupe/verify.
 - NFC normalization is deferred (stdlib-only constraint); matching uses
   lowercase + whitespace/line-ending normalization on precomposed fixtures.
 - No recall measurement yet; Phase 7 waits for WANG Jiaqi's evaluation set.
+
+## Phase 2 — source loading and content version (2026-11-14)
+
+### What changed
+
+- **Migration 084** (`084_content_revision.sql` + Go step `addContentVersion`):
+  adds `content_revision` (monotonic INTEGER, default 1) and `content_hash`
+  (SHA-256 of the normalized snapshot) to `saved_content`; backfills legacy
+  rows with revision 1 + computed hash; pragma-checked and idempotent. B owns
+  the column set; a test asserts exactly one migration introduces it.
+- **`content.Item`**: new server-owned `ContentRevision`/`ContentHash`
+  (`omitempty`), exposed through Get/List/Page and the library JSON API.
+  `Store.Save` ignores client-supplied values, increments the revision on
+  every successful update, replaces the hash, and never embeds the fields in
+  the payload.
+- **`retrieval.SnapshotHash` / `SnapshotRange`** (domain): canonical
+  normalized-snapshot hash (whitespace/line-ending normalized, case
+  preserved, version/contentID excluded) and exact locator-range re-read.
+- **`sqlite.RetrievalSource`**: implements the `retrieval.PassageSource` port
+  — normalized article/discussion snapshots, saved subtitle tracks (cue IDs
+  are deterministic language-qualified indices; saved cues have no DB ID),
+  and fresh re-reads for INV-05. PDF page text joins in Phase 3.
+
+### Verification (test-first; raw logs retained)
+
+- Red run retained (`b-impl-phase2-red.log`); green after implementation.
+- New tests: B-T03 (144,011-rune subtitle fixture, gold cue 2,999, locator
+  `subtitle:zh:2992-2999`, cue IDs, exact text once), B-T19 storage half
+  (update → `stale_source`, fresh selection carries revision 2), B-T28
+  revision part (old reference invalid, new verifies), B-T38 (old-DB upgrade
+  backfill, increment, idempotent re-open, single column owner, API shape),
+  domain hash/range determinism (`b-impl-phase2-tests.log`).
+- Gates: focused exit 0 (`b-impl-phase2-focused.log`); full 44 ok / 11
+  no-test exit 0 (`b-impl-phase2-go-full.log`); layering + vet + A-budget
+  empty diff + published migrations unchanged (`b-impl-phase2-layering.log`);
+  frontend 62 files / 251 tests + build exit 0 (`b-impl-phase2-web.log`);
+  two-run determinism identical (`b-impl-phase2-determinism.log`).
+- Two existing upgrade tests (progress, subscriptions) now assert the
+  backfill fields explicitly, then compare every original field unchanged;
+  the library card projection exposes the version fields consistently.
+- Phase report: `docs/evidence/b-impl-phase2-report.md`.
+
+### Limits
+
+- PDF page-text store/extraction is Phase 3; the PDF snapshot kind currently
+  carries no pages. Embedding/rerank adapters and the B budget are Phase 4.
+- `content_hash` covers the article/discussion snapshot in `saved_content`;
+  subtitle versions use the existing saved-track revision, PDF uses the
+  document hash + extractor provenance (per plan).
