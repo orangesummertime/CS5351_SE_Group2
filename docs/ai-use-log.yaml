@@ -875,3 +875,63 @@ entries:
       a missing local server degrades to lexical_only at call time. No
       migration added this phase. Implementation acceptance and APPROVE
       remain human non-author actions.
+  - id: B-AI-014
+    date: "2026-11-14"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Implementation Phase 6 (frontend wiring) for FR-02, NFR-02, INV-04,
+      INV-05 on owner/b-implementation, after the human confirmed Phase 5.
+      Test-first: wrote vitest tests for the retrieval request fragment
+      (B-T01 off byte-compatible), settings validation (B-T31 per-model
+      dimensions/row limits, B-T32 weights, B-T35 masking, rerank-zero-budget
+      guard), status presentation (B-T25 distinct copy, sweep-limited !=
+      no_match; B-T05 no_match) and a RetrievalStatus component test, then
+      implemented the pure modules (retrieval.ts, retrievalSettings.ts,
+      retrievalPresentation.ts), the RetrievalStatus and RetrievalSettings
+      components, and wired an opt-in retrieval toggle + response rendering
+      into AIChatPanel. The legacy buildChatContext path is untouched when off.
+    scope:
+      read:
+        - "docs/plans/b-retrieval-preimplementation.md (frontend responsibilities, settings UI contract), docs/architecture/adr/002-question-relevant-retrieval.md (wire envelope, statuses)"
+        - "src/web/src/features/ai/AIInsights.tsx, chatContext.ts, callBudget.ts, chatPresentation.ts, types.ts, AISettings.tsx; src/web/src/shared/api/client.ts; src/web/vitest.config.ts, package.json; existing component-test pattern (renderToStaticMarkup)"
+      wrote:
+        - "src/web/src/features/ai/retrieval.ts (+test), retrievalSettings.ts (+test), retrievalPresentation.ts (+test)"
+        - "src/web/src/features/ai/RetrievalStatus.tsx (+test), RetrievalSettings.tsx"
+        - "src/web/src/features/ai/AIInsights.tsx (opt-in toggle, retrieval request fragment, response capture, RetrievalStatus render), ai.css (retrieval styles)"
+        - "docs/evidence/b-impl-phase6-web.log, b-impl-phase6-go.log, b-impl-phase6-determinism.log, b-impl-phase6-report.md"
+        - "docs/ai-use-log.yaml (this entry)"
+        - "contributions/013-owner-b-implementation.md (Phase 6 section)"
+        - "owner-local, not committed: docs/transcripts/owner-b/2026-11-14-phase6-frontend.json, README.md (new index row)"
+      executed:
+        - "npm --prefix src/web test -- --run (66 files / 278 tests, exit 0; +27 new retrieval tests)"
+        - "npm --prefix src/web run build (incl. tsc --noEmit, exit 0)"
+        - "go test ./... -count=1 (45 ok / 11 no-test, exit 0) + layering (exit 0) — frontend-only phase, no backend regression"
+        - "two-run frontend determinism diff identical (exit 0, 27 PASS/run); git diff main A-budget empty"
+        - "git commit (phase 6); no push in this session"
+        - "Read-only export of this session via src/build/sexport at phase end (after the commit); sha256 recorded in the local README"
+    network_writes: []
+    original_session_id: ses_e27efbad7ffeY2pIG6EzRIOgOQ
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-14-phase6-frontend.json
+      (raw OpenCode session export retained outside git; one continuous
+      session with B-AI-008..013, captured at phase end after the commit; can
+      be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: true
+    notes: >-
+      No real provider, credential or network endpoint was used; frontend
+      tests are pure-module vitest plus renderToStaticMarkup component tests
+      (node environment, no browser). The retrieval toggle defaults to off, so
+      the legacy buildChatContext path and chat body remain byte-compatible
+      (B-T01). The frontend only sends the retrieval request and renders the
+      server's response; it is never the authority for retrieval, embeddings
+      or locators, and never fabricates a passage. semantic_sweep_limited is
+      rendered as a coverage limitation, never as no_match, and valid passages
+      are kept. The settings form masks the key (hasKey only), enforces
+      per-model Bailian dimension choices and the rerank-with-zero-budget
+      guard. pdf.js remains display-only (unchanged). No backend code changed
+      this phase; A's budget files remain byte-identical to main.
+      Implementation acceptance and APPROVE remain human non-author actions.

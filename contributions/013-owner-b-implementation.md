@@ -304,3 +304,43 @@ load/split → lexical → sweep → embed → dedupe/verify.
   settings-driven selector config (weights/topK from saved settings) is a
   refinement for the frontend phase.
 - No real provider call; fake provider/source/embedder and fake AIService.
+
+## Phase 6 — frontend wiring (2026-11-14)
+
+### What changed
+
+- **Pure modules** (`retrieval.ts`, `retrievalSettings.ts`,
+  `retrievalPresentation.ts`): the namespaced wire types + request fragment
+  (empty when off → byte-compatible legacy body); local-first settings with
+  per-model Bailian dimension choices, weight/budget validation, rerank-zero
+  guard and secret masking (hasKey only); distinct status copy/tone and
+  passage-chip labels (semantic_sweep_limited ≠ no_match).
+- **Components** (`RetrievalStatus.tsx`, `RetrievalSettings.tsx`): explicit
+  status + verifiable passage chips (coverage-limited keeps passages); a
+  settings form with per-model dimensions and the rerank guard.
+- **AIChatPanel wiring** (`AIInsights.tsx`, `ai.css`): an opt-in retrieval
+  toggle (default off), the retrieval request fragment, response capture
+  (JSON + SSE), and RetrievalStatus rendering. The legacy buildChatContext
+  path is untouched when off; pdf.js remains display-only.
+
+### Verification (test-first; raw logs retained)
+
+- 27 new vitest tests: B-T01 (off byte-compatible, legacy context untouched),
+  B-T05 (no_match marker, zero chips), B-T25 (distinct status copy,
+  sweep-limited ≠ no_match with passages kept, PDF retry hints), B-T31
+  (per-model dims/row limits, local loopback), B-T32 (weights), B-T35
+  (masking, no key leak).
+- Gates: frontend 66 files / 278 tests + build (incl. tsc --noEmit) exit 0
+  (`b-impl-phase6-web.log`); Go regression 45 ok / 11 no-test + layering exit 0
+  (`b-impl-phase6-go.log`); two-run frontend determinism identical
+  (`b-impl-phase6-determinism.log`).
+- Phase report: `docs/evidence/b-impl-phase6-report.md`.
+
+### Limits
+
+- The settings panel is a self-contained component; full integration into the
+  AISettings page navigation and live save/reload against the backend
+  settings endpoint is a follow-up (the validation/masking logic is complete
+  and tested).
+- No browser/E2E run (node-environment vitest + renderToStaticMarkup only).
+- Phase 7 evaluation still waits for WANG Jiaqi's gold-labeled set.
