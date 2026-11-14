@@ -480,3 +480,70 @@ entries:
       treated as data, not instructions. The approval applies to 33016ce;
       independent verification of the resulting merged head remains required
       before merge.
+  - id: B-AI-008
+    date: "2026-11-14"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Implementation Phase 0 (approval and preconditions gate) for FR-02,
+      NFR-02, INV-04 and INV-05 on the new branch owner/b-implementation
+      (created from main 83c7726). Verify the PR #2 approval chain read-only
+      via git and the GitHub REST API, record the approval in the ADR-002,
+      implementation-plan and requirements.yaml status headers (status and
+      approval reference only; no technical content changed), re-run the
+      baseline Go/frontend suites before any change, verify toolchains,
+      migration-number availability and the greenfield retrieval package, and
+      produce the Phase 0 report. No implementation code was written or
+      generated in this phase.
+    scope:
+      read:
+        - "git history (main, origin/main, merge commit 83c7726, head da21804)"
+        - "GitHub REST API read-only GET: pulls/2 and pulls/2/reviews (approval chain verification)"
+        - "docs/architecture/adr/002-question-relevant-retrieval.md, docs/plans/b-retrieval-preimplementation.md, docs/req/requirements.yaml + req-schema.json, docs/evidence/b-embedding-provider-notes.md, b-paddleocr-notes.md, b-eval-protocol.md, b-baseline.md, b-context-audit.md (section map), docs/ARCHITECTURE.md"
+        - "code landmarks: src/internal/ai/chat.go, settings.go, src/internal/adapters/aichat/protocol.go, src/internal/transport/http/ai_common.go, src/internal/app/feature_services.go, src/internal/content/content_types.go, src/internal/subtitles/saved.go, src/internal/adapters/sqlite/store.go + migrations/, src/internal/layering/layering_test.go, src/web/src/features/ai/chatContext.ts"
+      wrote:
+        - "docs/architecture/adr/002-question-relevant-retrieval.md (Status header, Decision heading status marker, appended Review-gate approval record)"
+        - "docs/plans/b-retrieval-preimplementation.md (Status header, appended Approval-gate record)"
+        - "docs/req/requirements.yaml (FR-02/NFR-02/INV-04/INV-05 approval pending -> approved; top-level note appended with the PR #2 review reference; schema-validated)"
+        - "docs/evidence/b-impl-phase0-approval.json, b-impl-phase0-approval.log, b-impl-phase0-baseline-go.log, b-impl-phase0-baseline-vitest.log, b-impl-phase0-report.md"
+        - "docs/ai-use-log.yaml (this entry)"
+        - "contributions/013-owner-b-implementation.md (Phase 0 section), contributions/README.md (index row 013)"
+        - "owner-local, not committed: docs/transcripts/owner-b/2026-11-14-phase0-gate.json, README.md (new index row)"
+      executed:
+        - "git checkout -b owner/b-implementation main (83c7726 == origin/main)"
+        - "curl read-only GitHub API pulls/2 + pulls/2/reviews; asserted the single APPROVED review 5897467590 by orangesummertime at 2026-11-13T20:19:58Z on da21804; merge_commit_sha 83c7726 matches local main"
+        - "go test ./... -count=1 in src (43 ok packages, 11 no-test packages, exit 0)"
+        - "npm ci --no-audit --no-fund (159 packages), npm run build (exit 0, chunk-size warning only), npm test -- --run (62 files / 251 tests passed) in src/web"
+        - "migration listing (latest 081_selected_subtitle_index.sql; 082/083/084 free), greenfield check (src/internal/retrieval absent), A-budget read-only check (git diff main empty for budget.go/ledger.go/aichat/budget.go)"
+        - "python3 yaml.safe_load + jsonschema validation of requirements.yaml against req-schema.json (PASS)"
+        - "git commit (documentation only); no push in this session"
+        - "Read-only export of this session via src/build/sexport at session end (after the commit); sha256 recorded in the local README"
+    network_writes: []
+    original_session_id: ses_e27efbad7ffeY2pIG6EzRIOgOQ
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-14-phase0-gate.json
+      (raw OpenCode session export retained outside git; captured at session
+      end after the commit, so the final reply write may postdate the capture;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted, and no browser was started. Network activity was limited to
+      read-only GitHub REST API GETs for approval verification and npm registry
+      reads during npm ci; no push and no GitHub API write. The baseline
+      vitest count on current main is 62 files / 251 tests (A's PR #6 tests
+      included), not the 61 / 231 recorded before that merge; both suites pass
+      unfiltered with -count=1 / --run. Toolchains are not on the default
+      non-interactive PATH; commands used per-invocation PATH prefixes
+      (~/.local/bin for node/npm, ~/sdk/go1.27.1/bin for go) with no persistent
+      environment change. One residual documentation inconsistency was found
+      and reported (plan overview paragraphs still describe a conditional
+      sweep trigger; ADR-002 and the plan's detailed budget section require the
+      unconditional sweep; ADR precedence applies, flagged for human
+      confirmation, no technical content edited). The Phase 7 evaluation set
+      (20+ questions with gold labels, owned by WANG Jiaqi) was asked about in
+      the Phase 0 report; Phase 7 waits for it. Implementation acceptance and
+      APPROVE remain human non-author actions; this phase claims neither.
