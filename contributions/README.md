@@ -13,7 +13,10 @@ Records start with this fork's first group commit. Each entry states the actual 
 | [007](007-owner-a-adr-alignment.md) | `docs: align A decision record with live evidence` | Kefan CHEN | ADR status, streaming evidence, and review gate |
 | [008](008-owner-a-integration-inventory.md) | `docs: map A provider-call integration boundaries` | Kefan CHEN | HTTP, service and provider call map for shared budget review |
 | [009](009-owner-a-readme-status.md) | `docs: mark completed owner A work in README` | Kefan CHEN | Evidence-based A checklist status and pending PR labels |
+| [010](010-owner-b-review-package.md) | `docs: prepare owner B retrieval review package` | WANG Jiaqi | B baseline, hybrid retrieval with configurable embedding/rerank and budget, PDF/PaddleOCR design, test plan, evaluation protocol, course test layout, and AI-use disclosure |
 | [011](011-owner-a-budget-implementation.md) | `feat: add per-invocation AI provider call budgets` | Kefan CHEN | Invocation ledger, adapter/service/HTTP/UI integration, tests and measured comparison |
 | [012](012-owner-a-stream-review-fixes.md) | `fix: preserve AI stream and summary terminal states` | Kefan CHEN | Strict limited-stream completion, usage-only chunks and summary failure snapshots |
 
 The upstream history predates this group record and is not reconstructed here.
+Numbering is append-only and shared by all owners; a new owner takes the next free
+number after the records already merged into `main`.

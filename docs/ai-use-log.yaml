@@ -1,3 +1,6 @@
+version: 1
+# Shared AI-use log. Entries are appended per owner and never replaced.
+# A's entries from owner/a-foundation were merged in; B's entries follow.
 # Original session export is retained by the owner outside this repository.
 # The export can be supplied for course review without altering its contents.
 entries:
@@ -53,3 +56,427 @@ entries:
     verification: Focused and race Go tests, vet and otherwise-full uncached Go regression passed with only the existing FFmpeg exact-duration test excluded; current scripted workflow comparison replayed successfully. Frontend unchanged; prior 251-test/build result retained.
     network_activity: CityU model inference and local-loopback deterministic HTTP tests; no live application-provider evaluation or browser.
     review: Technical follow-up only; final independent implementation approval remains pending.
+  - id: B-AI-001
+    date: "2026-11-12"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "deepseek-v4.1-flash-1017"
+    purpose: >-
+      Full-chain read-only reconnaissance of the Tangentry reader, summary,
+      chat, transport, AI service, provider, content, subtitle, PDF and SQLite
+      paths, followed by the owner B documentation review package for hybrid
+      sentence/segment retrieval, local-first user-configurable embedding and
+      rerank settings (local/custom/Bailian), a B-only retrieval budget,
+      server-side PDF extraction with local PaddleOCR default and cloud opt-in,
+      content revision migration coordination, baseline
+      evidence, requirements, ADR, test plan, evaluation protocol and course
+      test layout. No product implementation code was generated.
+    scope:
+      read:
+        - "README.md (B task rows and acceptance table)"
+        - "docs/ARCHITECTURE.md"
+        - "src/web/src/features/ai/chatContext.ts and chatContext.test.ts"
+        - "src/web/src/features/ai/AIInsights.tsx (full)"
+        - "src/web/src/features/ai/useSummary.ts (full)"
+        - "src/web/src/features/ai/SummaryControl.tsx (full)"
+        - "src/web/src/features/ai/AISettings.tsx (full)"
+        - "src/web/src/features/ai/summaryTypes.ts, summaryPresentation.ts, summaryMarkdown.ts, chatPresentation.ts, promptTemplates.ts, modelPicker.ts, types.ts"
+        - "src/web/src/features/ai/useSubtitleTranslation.ts, SubtitleTranslation.tsx, TextTranslation.tsx, ModelPickerView.tsx"
+        - "src/web/src/app/ContentReadingWorkspace.tsx, ReadingWorkspace.tsx, YouTubeReadingWorkspace.tsx, useSubtitleAssistance.tsx"
+        - "src/web/src/features/reader/MediaReader.tsx, ArticleReader.tsx, FullTextArticle.tsx, FeedDocumentReader.tsx"
+        - "src/web/src/shared/reader/ReadingNotebook.tsx"
+        - "src/web/src/features/subtitles/SubtitleReader.tsx, SubtitlePage.tsx"
+        - "src/web/src/features/documents/PDFReader.tsx (full)"
+        - "src/web/src/shared/api/types.ts (content/subtitle models)"
+        - "src/internal/ai/chat.go, translation_types.go, input.go, prompts.go, summary.go, summary_generate.go, summary_document.go, summary_validation.go, summary_store.go, summary_types.go, translation.go, translation_batch.go, translation_rules.go, translation_storage.go, legacy_cache.go, check.go, settings.go, results.go, memory_results.go"
+        - "src/internal/transport/http/ai_summary.go, ai_common.go, ai_errors.go, ai_settings.go, ai_translation.go, routes_ai.go, ports_ai.go, library.go, saved_subtitles.go, ai_test.go"
+        - "src/internal/content/content_types.go, content.go, content_query.go, content_validation.go, content_projection.go"
+        - "src/internal/subtitles/subtitles.go, saved.go"
+        - "src/internal/adapters/sqlite/library.go, store.go, saved_subtitles.go, migrations.go and selected migrations"
+        - "src/internal/adapters/aichat/client_test.go, protocol.go, protocol_stream_test.go, summary.go, translation.go"
+        - "src/internal/layering/layering_test.go"
+        - "src/internal/app/feature_services.go, wire_services.go"
+        - "contributions/README.md, 001-group-scope.md"
+        - "Public Aliyun Bailian text-embedding and text-rerank documentation (read-only, no live call)"
+        - "User-provided PaddleOCR job-flow snippet (design reference only; token not used or stored)"
+        - "owner/a-foundation branch documents via git show (read-only coordination)"
+      wrote:
+        - "docs/req/req-schema.json"
+        - "docs/req/requirements.yaml"
+        - "docs/architecture/adr/002-question-relevant-retrieval.md"
+        - "docs/plans/b-retrieval-preimplementation.md"
+        - "docs/evidence/b-context-audit.md"
+        - "docs/evidence/b-baseline.md"
+        - "docs/evidence/b-baseline.log"
+        - "docs/evidence/b-fts-probe.log"
+        - "docs/evidence/b-context-byte-probe.log"
+        - "docs/evidence/b-unicode-probe.log"
+        - "docs/evidence/b-go-full.log"
+        - "docs/evidence/b-vitest-full.log"
+        - "docs/evidence/b-eval-protocol.md"
+        - "docs/evidence/b-embedding-provider-notes.md"
+        - "docs/evidence/b-paddleocr-notes.md"
+        - "docs/debt-register.md"
+        - "test/README.md"
+        - "test/offline/README.md"
+        - "test/live/README.md"
+        - "contributions/006-owner-b-review-package.md"
+        - "contributions/README.md (index row only)"
+        - "README.md (B owner and assignment text only)"
+        - "docs/ai-use-log.yaml (this file)"
+      executed:
+        - "git branch/status/log/ls-remote, git checkout main, git checkout -b owner/b-retrieval"
+        - "git fetch origin --prune, git merge origin/main, git push origin owner/b-retrieval"
+        - "GitHub API read existing PR #1 and create/update docs-only PR #2"
+        - "go test ./... -count=1 (full Go suite)"
+        - "go test focused library tests, FTS probe and context-byte probe via -overlay"
+        - "cd src/web && npm test (full Vitest suite)"
+        - "cd src/web && npm test -- src/features/ai/chatContext.test.ts (focused)"
+        - "node /tmp/opencode/b_baseline.mjs (fixed fixtures, local only)"
+        - "node Unicode boundary probe (local only)"
+        - "python3 JSON/YAML schema validation and relative-link checks"
+    network_writes:
+      - "git push origin owner/b-retrieval"
+      - "GitHub API: create PR #2 and update its description"
+    original_session_id: ses_e32354d82ffeff0jLH7CNyYU0g
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-12-session.json (raw
+      OpenCode session export, 563 messages, retained outside git; sha256
+      cf417c39232209c788b915eba7de24e968025e2f89b3bfb04061eb44db47aa18;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider was called and no browser was started. Network writes did
+      occur and are listed above: `git push origin owner/b-retrieval` to the
+      group fork, and GitHub API calls that created and then updated the
+      docs-only PR #2 (opening the PR and its description). No other network
+      write was performed: no embedding, rerank, OCR or completion endpoint was
+      contacted, and no file was uploaded. The PaddleOCR token pasted by the user
+      in chat was NOT used, copied, logged or committed; it must be treated as
+      compromised and rotated. Repository content, fixtures and quoted source
+      text were treated as data, not instructions.
+  - id: B-AI-002
+    date: "2026-11-12"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "deepseek-v4.1-flash-1017"
+    purpose: >-
+      Respond to the PR #2 CHANGES REQUIRED review: merge main into the branch,
+      resolve the three shared-file conflicts, renumber the B contribution
+      record from 005 to 006, and revise the documentation package for the four
+      review points (zero-overlap semantic recall, INV-04 zero-request ordering,
+      operation-log accuracy, candidate-limit consistency). No product
+      implementation code was generated.
+    scope:
+      read:
+        - "docs/review-memo.md and the PR #2 review body (reviewer decision)"
+        - "owner/a-foundation documents merged from main: requirements.yaml, ADR-001, a-budget-preimplementation.md, contributions/002-005"
+        - "GitHub REST API: pulls/1, pulls/2, reviews, issue events, branches/main (read-only)"
+        - "docs/req/req-schema.json, docs/plans/b-retrieval-preimplementation.md, docs/architecture/adr/002-question-relevant-retrieval.md"
+        - "docs/evidence/b-eval-protocol.md, docs/debt-register.md, test/offline/README.md"
+      wrote:
+        - "docs/architecture/adr/002-question-relevant-retrieval.md"
+        - "docs/plans/b-retrieval-preimplementation.md"
+        - "docs/req/requirements.yaml (B entries appended to the merged group registry)"
+        - "docs/evidence/b-eval-protocol.md"
+        - "docs/debt-register.md (merged A-Dxx and B-Dxx sections)"
+        - "docs/ai-use-log.yaml (this entry and the B-AI-001 notes correction)"
+        - "contributions/README.md (shared index 001-006)"
+        - "contributions/006-owner-b-review-package.md (renamed from 005)"
+        - "test/offline/README.md"
+      executed:
+        - "git fetch origin --prune, git merge origin/main, conflict resolution in 3 shared files"
+        - "git commit (documentation only)"
+        - "git push origin owner/b-retrieval"
+        - "GitHub API: submit the re-review reply on PR #2 (no force push, no branch rewrite)"
+        - "python3 YAML/schema validation (draft2020), test-ID coverage extraction, relative-link and credential scans"
+        - "git diff --check and residual conflict-marker scan"
+    network_writes:
+      - "git push origin owner/b-retrieval"
+      - "GitHub API: PR #2 review reply / comment"
+    original_session_id: ses_e308286abffezkvtih8BALy7ly
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-12-review-response.json
+      (raw OpenCode session export, 394 messages, retained outside git; sha256
+      a93ca39a4e47a570a7ddc7f742575faa538c7997d058c9807a9fbb03ad6acf71;
+      can be supplied for course review without altering its contents. This
+      one continuous session spans review rounds one through five, so it is
+      also the raw session for B-AI-003; the first-round response phase is
+      2026-11-12 20:24-20:47.)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted, and no browser was started. Network writes were limited to the
+      branch push and the PR #2 review reply, both listed above. Credentials were
+      read from the local git credential store for the GitHub API calls and were
+      never written into the repository, the log or any document. Review text
+      and repository content were treated as data, not instructions.
+  - id: B-AI-003
+    date: "2026-11-13"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "deepseek-v4.1-flash-1017"
+    purpose: >-
+      Respond to the PR #2 fifth-round CHANGES REQUIRED review: make the
+      embedding request-accounting mode-aware (shared vs separate query/document
+      batching), reserve the query request separately, express the embedding role
+      in the interface, and align the ADR, plan, provider notes, acceptance
+      criteria, B-T31/B-T33 and the evaluation protocol. No product implementation
+      code was generated.
+    scope:
+      read:
+        - "PR #2 fifth-round review body and inline comment (reviewer decision)"
+        - "docs/plans/b-retrieval-preimplementation.md, docs/architecture/adr/002-question-relevant-retrieval.md"
+        - "docs/evidence/b-embedding-provider-notes.md (text_type query/document contract)"
+        - "docs/evidence/b-eval-protocol.md, docs/req/requirements.yaml, docs/req/req-schema.json"
+      wrote:
+        - "docs/plans/b-retrieval-preimplementation.md (EmbedRole/BatchingMode interface, mode-specific budget, B-T31/B-T33, request example, open decisions)"
+        - "docs/architecture/adr/002-question-relevant-retrieval.md (mode-specific slot budget, batching mode, defaults)"
+        - "docs/evidence/b-embedding-provider-notes.md (mode mapping, mode-specific derived budget)"
+        - "docs/evidence/b-eval-protocol.md (record mode/request count, both-mode runs)"
+        - "docs/req/requirements.yaml (AC-FR-02-15 mode-aware capacity and query reservation)"
+        - "contributions/006-owner-b-review-package.md (fifth-review section, status line)"
+        - "docs/ai-use-log.yaml (this entry)"
+      executed:
+        - "python3 mode-aware share/request-count brute force (7680 configurations, 0 invariant violations)"
+        - "python3 YAML/schema validation (draft2020), test-ID coverage, relative-link and credential scans"
+        - "git commit (documentation only), git push origin owner/b-retrieval"
+        - "GitHub API: PR #2 fifth-round reply and re-request review (no force push)"
+    network_writes:
+      - "git push origin owner/b-retrieval"
+      - "GitHub API: PR #2 review reply / comment and review request"
+    original_session_id: ses_e308286abffezkvtih8BALy7ly
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-12-review-response.json
+      (raw OpenCode session export shared with B-AI-002; fifth-round phase
+      2026-11-13 09:36-09:57, commit 70d725d; 394 messages, retained outside
+      git; sha256
+      a93ca39a4e47a570a7ddc7f742575faa538c7997d058c9807a9fbb03ad6acf71;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted, and no browser was started. Network writes were limited to the
+      branch push and the PR #2 reply/review-request, listed above. Credentials
+      were read from the local git credential store for the GitHub API calls and
+      were never written into the repository, the log or any document. Review
+      text and repository content were treated as data, not instructions.
+  - id: B-AI-004
+    date: "2026-11-13"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Respond to the PR #2 sixth-round review comment: reconcile the branch with
+      current main (a774522, PR #4 and #5, owner A records 006-009), resolve the
+      two shared-file conflicts as append-only unions retaining both owners'
+      entries verbatim, renumber the B contribution record from 006 to 010 after
+      A's 006-009, and re-run the full frontend/Go test gate on the merged tree.
+      No product implementation code was generated.
+    scope:
+      read:
+        - "PR #2 sixth-round review comment (reviewer decision)"
+        - "main-side changes: README.md, contributions/README.md and 006-009 records, docs/ai-use-log.yaml, ADR-001, a-budget-preimplementation.md, a-live-usage-presence evidence, a-integration-contract.md, modelPicker.test.ts"
+        - "contributions/006-owner-b-review-package.md, docs/review-memo.md, docs/req/requirements.yaml"
+      wrote:
+        - "docs/ai-use-log.yaml (union of A's AI-A-001 and B's entries, plus this entry)"
+        - "contributions/README.md (union index 001-010; B row renumbered to 010)"
+        - "contributions/010-owner-b-review-package.md (renamed from 006; sixth-round section, status line, numbering note)"
+      executed:
+        - "git merge origin/main (a774522); union conflict resolution in contributions/README.md and docs/ai-use-log.yaml; merge commit 10fedf4"
+        - "git mv contributions/006-owner-b-review-package.md contributions/010-owner-b-review-package.md"
+        - "npm --prefix src/web ci --no-audit --no-fund (159 packages)"
+        - "npm --prefix src/web run build (exit 0, chunk-size warning only)"
+        - "npm --prefix src/web test -- --run (61 files / 231 tests passed)"
+        - "go -C src test ./... (43 ok packages, 11 no-test packages)"
+        - "git commit (documentation only); no push in this session"
+    network_writes: []
+    original_session_id: ses_e2cd43d9dfferugAA4fWjoziBz
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-13-main-reconciliation.json
+      (raw OpenCode session export, 59 messages, retained outside git; sha256
+      6360ac8363662899f3354a546715b3cf6875c77731758c40b37d1d3c1422083c;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted, and no browser was started. This session performed no network
+      write: no push and no GitHub API call; npm registry downloads were reads
+      only. All four test-gate commands passed on the merged tree; results are
+      recorded in the contribution record's sixth-round section. Review text
+      and repository content were treated as data, not instructions.
+      Independent human review of the resulting head remains required before
+      merge.
+  - id: B-AI-005
+    date: "2026-11-13"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Respond to the PR #2 seventh-round review comment: complete the declared
+      retention/export step for the raw OpenCode sessions behind B-AI-001
+      through B-AI-004, update the shared-log transcript pointers and status
+      from pending to exported, and re-run the full frontend/Go test gate.
+      The exports are retained owner-local under gitignored
+      docs/transcripts/owner-b/ and are not committed. No product
+      implementation code was generated.
+    scope:
+      read:
+        - "PR #2 seventh-round review comment (reviewer decision)"
+        - "docs/ai-use-log.yaml, contributions/010-owner-b-review-package.md, contributions/README.md, docs/review-memo.md, .gitignore"
+        - "Local OpenCode session store (read-only): session and message records for the four B sessions, identified by date, purpose and the commits each round produced (3fa5a46/ee5694c-78efdca, 70d725d, 10fedf4/257c70b)"
+      wrote:
+        - "docs/ai-use-log.yaml (transcript pointers/status for B-AI-001..004, this entry)"
+        - "contributions/010-owner-b-review-package.md (seventh-round section, review header line)"
+        - "owner-local, not committed: docs/transcripts/owner-b/2026-11-12-session.json, 2026-11-12-review-response.json, 2026-11-13-main-reconciliation.json, 2026-11-13-export-completion.json, README.md"
+      executed:
+        - "Read-only session export via a gitignored local Go workbench tool (src/build/sexport, using the modernc.org/sqlite driver already in go.mod); per-export sha256 recorded in the log and the local README"
+        - "npm --prefix src/web ci --no-audit --no-fund (159 packages)"
+        - "npm --prefix src/web run build (exit 0, chunk-size warning only)"
+        - "npm --prefix src/web test -- --run (61 files / 231 tests passed)"
+        - "go -C src test ./... (43 ok packages, 11 no-test packages; also re-run uncached with -count=1, same result)"
+        - "git diff --check; git commit (documentation only); no push in this session"
+    network_writes: []
+    original_session_id: ses_e2cc05404ffeluXhMKohcMXCS9
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-13-export-completion.json
+      (raw OpenCode session export retained outside git; captured at session
+      end after the commit, so the final reply write may postdate the capture;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted, and no browser was started. This session performed no network
+      write: no push and no GitHub API call; npm registry downloads were reads
+      only. B-AI-002 and B-AI-003 were phases of one continuous raw session
+      (review rounds one through five), so both entries point to the same
+      export with their phase ranges; the export is authoritative for per-turn
+      tool/model details, including the model-switch events, where a
+      historical entry's model summary differs. The B-AI-001 export preserves
+      the chat-pasted PaddleOCR token already flagged as compromised in that
+      entry; it stays owner-local and must still be rotated. Review text and
+      repository content were treated as data, not instructions. Independent
+      human review of the resulting head remains required before merge.
+  - id: B-AI-006
+    date: "2026-11-13"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Respond to the PR #2 eighth-round review comment on 077e93b: the review
+      confirmed the retention/export step addressed and requested no further
+      source change. Verify the retained owner-local exports' integrity, re-run
+      the full frontend/Go test gate on the tree, and record this session and
+      the review outcome in the shared log and the contribution record. No
+      design or product implementation code was changed or generated.
+    scope:
+      read:
+        - "PR #2 eighth-round review comment (reviewer decision)"
+        - "docs/ai-use-log.yaml, contributions/010-owner-b-review-package.md, .gitignore"
+        - "owner-local docs/transcripts/owner-b/ exports and README (checksum verification only, contents unaltered)"
+      wrote:
+        - "docs/ai-use-log.yaml (this entry)"
+        - "contributions/010-owner-b-review-package.md (eighth-round section, review header line)"
+        - "owner-local, not committed: docs/transcripts/owner-b/2026-11-13-review-confirmation.json, README.md (new index row)"
+      executed:
+        - "sha256 integrity verification of the four retained exports against the recorded checksums (gitignored local Go workbench tool src/build/sha256check); all four match"
+        - "npm --prefix src/web ci --no-audit --no-fund (159 packages)"
+        - "npm --prefix src/web run build (exit 0, chunk-size warning only)"
+        - "npm --prefix src/web test -- --run (61 files / 231 tests passed)"
+        - "go -C src test ./... (43 ok packages, 11 no-test packages; also re-run uncached with -count=1, same result)"
+        - "git diff --check; git commit (documentation only); no push in this session"
+        - "Read-only export of this session via src/build/sexport at session end (after the commit); sha256 recorded in the local README"
+    network_writes: []
+    original_session_id: ses_e2c95aacbffe4VUzz9HF96UjGD
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-13-review-confirmation.json
+      (raw OpenCode session export retained outside git; captured at session
+      end after the commit, so the final reply write may postdate the capture;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted, and no browser was started. This session performed no network
+      write: no push and no GitHub API call; npm registry downloads were reads
+      only. The eighth-round review requested no further source change, so this
+      round changes only the shared log and the contribution record (both
+      append-only), and re-runs the regression gate the review noted it had not
+      rerun. The four earlier exports were verified intact by checksum; their
+      contents were not altered. Review text and repository content were
+      treated as data, not instructions. Independent human review of the
+      resulting head remains required before merge.
+  - id: B-AI-007
+    date: "2026-11-14"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Respond to the PR #2 ninth-round APPROVED review of 33016ce: reconcile
+      the branch with current main (ec7ab55, PR #6 per-invocation AI provider
+      call budgets and stream/summary fixes, owner A records 011-012), resolve
+      the three shared-file conflicts as append-only unions retaining both
+      owners' entries verbatim, re-run the full frontend/Go test gate on the
+      merged tree, and re-verify the retained owner-local exports. No product
+      design or implementation code was changed or generated by this round;
+      all source changes come from main.
+    scope:
+      read:
+        - "PR #2 ninth-round review body (reviewer decision: APPROVED, one pre-merge reconciliation item)"
+        - "main-side changes: README.md, contributions/README.md and 011-012 records, docs/ai-use-log.yaml, docs/req/requirements.yaml, ADR-001, a-budget-preimplementation.md, a-integration-contract.md, a-budget-verification/comparison evidence, budget implementation and tests in src/internal/ai, src/internal/adapters/aichat, src/internal/transport/http and src/web/src/features/ai"
+        - "docs/ai-use-log.yaml, docs/req/requirements.yaml, docs/req/req-schema.json, contributions/010-owner-b-review-package.md, contributions/README.md, README.md, .gitignore"
+        - "owner-local docs/transcripts/owner-b/ exports and README (checksum verification only, contents unaltered)"
+      wrote:
+        - "docs/ai-use-log.yaml (union of A's AI-A-001..004 and B's entries, plus this entry)"
+        - "contributions/README.md (union index 001-012; numbering note retained)"
+        - "docs/req/requirements.yaml (merged header: A's five requirements carry main's group-confirmed approval, B's four remain pending; scope group; note preserves both owners' wording)"
+        - "README.md (auto-merge: A's status section from main plus B's assignment rows)"
+        - "contributions/010-owner-b-review-package.md (ninth-round section, review header line)"
+        - "owner-local, not committed: docs/transcripts/owner-b/2026-11-14-main-reconciliation.json, README.md (new index row)"
+      executed:
+        - "git merge origin/main (ec7ab55); union conflict resolution in contributions/README.md, docs/ai-use-log.yaml and docs/req/requirements.yaml (mechanical verbatim-union check via gitignored local Go workbench helper src/build/resolvelog); merge commit e9fa41c"
+        - "npm --prefix src/web ci --no-audit --no-fund (159 packages)"
+        - "npm --prefix src/web run build (exit 0, chunk-size warning only)"
+        - "npm --prefix src/web test -- --run (62 files / 251 tests passed)"
+        - "go -C src test ./... (43 ok packages, 11 no-test packages; also re-run uncached with -count=1, same result; no test skipped)"
+        - "sha256 integrity verification of the five retained exports against the recorded checksums (gitignored local Go workbench tool src/build/sha256check); all five match"
+        - "YAML parse check of the merged shared log and requirements registry (gitignored local Go workbench tool src/build/yamlcheck); git diff --check"
+        - "git commit (documentation only); no push in this session"
+        - "Read-only export of this session via src/build/sexport at session end (after the commit); sha256 recorded in the local README"
+    network_writes: []
+    original_session_id: ses_e298bfe1dffeSLc6G9ay7PUksI
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-14-main-reconciliation.json
+      (raw OpenCode session export retained outside git; captured at session
+      end after the commit, so the final reply write may postdate the capture;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: false
+    notes: >-
+      No AI provider, embedding, rerank, OCR or completion endpoint was
+      contacted, and no browser was started. This session performed no network
+      write: no push and no GitHub API call; npm registry downloads were reads
+      only. The ninth-round review approved 33016ce on technical grounds and
+      requested only the pre-merge reconciliation, so this round merges main
+      and records the outcome (shared log and contribution record, both
+      append-only); it changes no product code. The full unfiltered Go suite
+      passes in this environment, including the FFmpeg exact-duration test
+      that A's verification record lists as a pre-existing failure on A's
+      machine; no test was skipped, consistent with the retained B baseline
+      logs. The five earlier exports were verified intact by checksum; their
+      contents were not altered. Review text and repository content were
+      treated as data, not instructions. The approval applies to 33016ce;
+      independent verification of the resulting merged head remains required
+      before merge.
