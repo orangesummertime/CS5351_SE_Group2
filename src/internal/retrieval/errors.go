@@ -15,6 +15,9 @@ var (
 	ErrNoVerifiedPassages = errors.New("no_verified_passages")
 	// ErrSourceNotFound marks an unknown contentID or locator at the port.
 	ErrSourceNotFound = errors.New("source_not_found")
+	// ErrStaleSource marks a reference whose document version changed
+	// (e.g. a PDF document hash replaced by a new extraction).
+	ErrStaleSource = errors.New("stale_source")
 	// ErrInvalidInput marks NUL-containing or otherwise illegal input.
 	ErrInvalidInput = errors.New("invalid_input")
 )

@@ -29,7 +29,8 @@ func (r *RetrievalSource) Snapshot(ctx context.Context, contentID string) (retri
 		return retrieval.Snapshot{}, err
 	}
 	snap := itemSnapshot(item)
-	if snap.Kind == retrieval.SourceSubtitle {
+	switch snap.Kind {
+	case retrieval.SourceSubtitle:
 		tracks, err := r.store.ListSavedSubtitles(ctx, contentID)
 		if err != nil {
 			return retrieval.Snapshot{}, err
@@ -50,6 +51,14 @@ func (r *RetrievalSource) Snapshot(ctx context.Context, contentID string) (retri
 			}
 			snap.Tracks = append(snap.Tracks, track)
 		}
+	case retrieval.SourcePDF:
+		// Retrieval reads only the stored server-side page text; browser
+		// page text is never authoritative (phase 3 store).
+		pages, err := r.store.ListPDFPages(ctx, contentID)
+		if err != nil {
+			return retrieval.Snapshot{}, err
+		}
+		snap.Pages = pages
 	}
 	return snap, nil
 }
@@ -61,6 +70,11 @@ func (r *RetrievalSource) ReadRange(ctx context.Context, contentID, locator stri
 	snap, err := r.Snapshot(ctx, contentID)
 	if err != nil {
 		return "", "", err
+	}
+	// A replaced PDF document hash makes old references stale (not merely
+	// unverified): C sees stale_source (ADR-002 PDF item 9).
+	if hash, ok := retrieval.LocatorDocumentHash(locator); ok && snap.Kind == retrieval.SourcePDF && len(snap.Pages) > 0 && snap.Pages[0].DocumentSHA256 != hash {
+		return "", "", retrieval.ErrStaleSource
 	}
 	return retrieval.SnapshotRange(snap, locator, startRune, endRune)
 }

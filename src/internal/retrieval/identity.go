@@ -161,6 +161,17 @@ func parseLocator(locator string) (locatorInfo, error) {
 	return locatorInfo{}, fmt.Errorf("invalid locator %q", locator)
 }
 
+// LocatorDocumentHash returns the document SHA-256 embedded in a PDF
+// locator (ok=false for non-PDF or malformed locators). Adapters use it to
+// detect a replaced document hash and report stale_source.
+func LocatorDocumentHash(locator string) (string, bool) {
+	info, err := parseLocator(locator)
+	if err != nil || info.Kind != SourcePDF {
+		return "", false
+	}
+	return info.DocHash, true
+}
+
 // passageOrder derives the deterministic tie-break position from the locator.
 func passageOrder(p Passage) sourceOrder {
 	info, err := parseLocator(p.Locator)

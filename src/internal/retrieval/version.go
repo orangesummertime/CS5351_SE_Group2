@@ -11,3 +11,7 @@ func subtitleVersion(revision int64) string {
 func pdfVersion(p Page) string {
 	return fmt.Sprintf("pdf-sha256:%s;extractor=%s;version=%s", p.DocumentSHA256, p.Extractor, p.ExtractorVersion)
 }
+
+// PDFPageVersion is the exported PDF page source-version form used by
+// adapters and tests (document hash + extractor provenance).
+func PDFPageVersion(p Page) string { return pdfVersion(p) }

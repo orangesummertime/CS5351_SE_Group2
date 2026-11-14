@@ -33,8 +33,8 @@ func VerifyPassages(ctx context.Context, src PassageSource, ps []Passage) ([]Pas
 		text, version, err := src.ReadRange(ctx, p.ContentID, p.Locator, p.StartRune, p.EndRune)
 		if err != nil {
 			reason := DropSourceUnverified
-			if errors.Is(err, ErrSourceNotFound) {
-				reason = DropSourceUnverified
+			if errors.Is(err, ErrStaleSource) {
+				reason = DropStaleSource
 			}
 			dropped = append(dropped, DroppedPassage{ID: p.ID, Reason: reason})
 			continue

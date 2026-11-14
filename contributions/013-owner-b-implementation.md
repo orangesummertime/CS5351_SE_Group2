@@ -151,3 +151,55 @@ load/split → lexical → sweep → embed → dedupe/verify.
 - `content_hash` covers the article/discussion snapshot in `saved_content`;
   subtitle versions use the existing saved-track revision, PDF uses the
   document hash + extractor provenance (per plan).
+
+## Phase 3 — PDF extraction (2026-11-14)
+
+### What changed
+
+- **Domain ports + service** (`retrieval/pdf.go`): `PDFTextExtractor`,
+  `OCRProvider`, `PDFTextStore`; `PDFExtractionService` orchestrates hash →
+  idempotency → native extraction → OCR fallback for text-less pages →
+  page-count validation → store. Statuses `ready`/`pdf_extracting`/
+  `pdf_ocr_unavailable`/`pdf_no_text`/`pdf_extract_failed`; at most one active
+  extraction per content+hash; no fabricated text. New `ErrStaleSource`
+  sentinel maps to `stale_source` in the verifier.
+- **Migration 082** `pdf_page_text`: `(content_id, page)` key +
+  document_sha256, page_count, text, text_sha256, extractor, extractor_version,
+  ocr_job_id, ocr_state, extracted_at; indexes on content_id and
+  document_sha256. Saving a new hash replaces old rows (invalidates old refs).
+- **Native extractor** (`adapters/pdftext/native.go`): vetted pure-Go
+  `github.com/ledongthuc/pdf` (BSD-3-Clause, zero deps, pinned; license in
+  `docs/licenses`). Per-page text, streamed document SHA-256, encrypted/corrupt
+  → explicit error, ctx honored.
+- **Local PaddleOCR** (`local_ocr.go`): user-installed runtime/model paths,
+  recommended `PaddleOCR-VL-1.6`, no token/upload; missing runtime/model →
+  unavailable; fake `CommandRunner` for tests.
+- **Cloud PaddleOCR** (`cloud_ocr.go`): feature-flagged OFF + consent required;
+  submit → bounded poll pending/running/done → download `resultUrl.jsonUrl` →
+  parse `result.layoutParsingResults[].markdown.text`; page-count validation;
+  token in header only, error bodies redacted.
+- **`RetrievalSource`** now loads stored PDF pages and reports `stale_source`
+  when a PDF locator's document hash was replaced.
+
+### Verification (test-first; raw logs retained)
+
+- Red run retained (`b-impl-phase3-red.log`); green after implementation.
+- New tests (20 in the determinism set): B-T04 (orchestration + native +
+  end-to-end page-50 selection), B-T27 (variants incl. encrypted/corrupt/
+  timeout/mismatch), B-T28 (domain + adapter hash invalidation), B-T34 (local
+  fake runtime, cloud fake job flow/failures/redaction), B-T37 (local-first +
+  cloud guards), concurrency, schema (`b-impl-phase3-determinism.log`).
+- Gates: focused exit 0 (`b-impl-phase3-focused.log`); full 45 ok / 11 no-test
+  exit 0 (`b-impl-phase3-go-full.log`); layering + vet + gofmt + A-budget empty
+  diff + published migrations unchanged (`b-impl-phase3-layering.log`);
+  frontend 62 files / 251 tests + build exit 0 (`b-impl-phase3-web.log`).
+- Phase report: `docs/evidence/b-impl-phase3-report.md`.
+
+### Limits
+
+- No real OCR runtime/model is bundled or downloaded; local OCR needs user
+  installation. Cloud OCR stays feature-flagged off pending legal/terms review
+  (B-D05). The native fixture uses ASCII text (font-independent); CJK PDFs are
+  exercised through the OCR path with fakes.
+- Embedding/rerank adapters + B budget are Phase 4; transport/AI integration
+  Phase 5; frontend Phase 6; evaluation Phase 7 (waits for WANG Jiaqi's set).

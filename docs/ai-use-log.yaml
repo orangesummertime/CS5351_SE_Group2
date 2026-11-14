@@ -677,3 +677,69 @@ entries:
       Subtitle cue IDs are deterministic language-qualified indices (saved
       cues have no database ID). Implementation acceptance and APPROVE remain
       human non-author actions.
+  - id: B-AI-011
+    date: "2026-11-14"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Implementation Phase 3 (PDF extraction) for FR-02, NFR-02, INV-04,
+      INV-05 on owner/b-implementation, after the human confirmed Phase 2 had
+      no blocking leftovers. Test-first: wrote B-T04 (text layer + OCR
+      fallback + end-to-end page-50 selection), B-T27 (corrupt/encrypted/
+      timeout/page-count variants), B-T28 PDF part (hash invalidation →
+      stale_source), B-T34 (local fake runtime + cloud fake job API + token
+      redaction) and B-T37 OCR part (local-first, cloud guards), recorded the
+      red run, then implemented the PDFTextExtractor/OCRProvider/PDFTextStore
+      domain ports and extraction service, migration 082 pdf_page_text, the
+      vetted pure-Go native extractor, local PaddleOCR adapter and
+      feature-flagged cloud job adapter, and wired PDF pages into the
+      RetrievalSource port.
+    scope:
+      read:
+        - "docs/architecture/adr/002-question-relevant-retrieval.md (Server-side PDF extraction), docs/plans/b-retrieval-preimplementation.md (PDF extraction design), docs/evidence/b-paddleocr-notes.md (job flow, security), docs/req/requirements.yaml (AC-FR-02-10/16/18)"
+        - "github.com/ledongthuc/pdf module (LICENSE BSD-3-Clause, per-page GetPlainText API) via the Go module proxy; src/internal/adapters/sqlite store/migrations; src/internal/retrieval ports/verify/identity"
+      wrote:
+        - "src/internal/retrieval/pdf.go + pdf_test.go (ports, extraction service, statuses)"
+        - "src/internal/retrieval/errors.go (ErrStaleSource), verify.go (stale mapping), identity.go (LocatorDocumentHash), version.go (PDFPageVersion)"
+        - "src/internal/adapters/pdftext/native.go, local_ocr.go, cloud_ocr.go (+ native_test.go, local_ocr_test.go, cloud_ocr_test.go)"
+        - "src/internal/adapters/sqlite/migrations/082_pdf_page_text.sql (new), pdf_page_text.go (+ pdf_page_text_test.go), retrieval_source.go (PDF pages + stale-hash detection)"
+        - "src/go.mod / src/go.sum (github.com/ledongthuc/pdf pinned); docs/licenses/ledongthuc-pdf-BSD-3-Clause.txt"
+        - "docs/evidence/b-impl-phase3-red.log, b-impl-phase3-focused.log, b-impl-phase3-go-full.log, b-impl-phase3-layering.log, b-impl-phase3-web.log, b-impl-phase3-determinism.log, b-impl-phase3-report.md"
+        - "docs/ai-use-log.yaml (this entry)"
+        - "contributions/013-owner-b-implementation.md (Phase 3 section)"
+        - "owner-local, not committed: docs/transcripts/owner-b/2026-11-14-phase3-pdf.json, README.md (new index row)"
+      executed:
+        - "go get github.com/ledongthuc/pdf@v0.0.0-20261020125853-5e46805f718e (Go module proxy read; license recorded); go mod tidy"
+        - "go test ./internal/adapters/pdftext/ -count=1: first run red (implementation pending), then green"
+        - "go test focused (retrieval/ai/transport/pdftext/sqlite) -count=1 (exit 0)"
+        - "go test ./... -count=1 (45 ok / 11 no-test, exit 0)"
+        - "go test ./internal/layering -count=1 (exit 0); go vet (exit 0); gofmt clean"
+        - "npm --prefix src/web test -- --run (62 files / 251 tests, exit 0); npm --prefix src/web run build (exit 0)"
+        - "two-run determinism diff identical (exit 0); git diff main A-budget empty; published migrations unchanged (082/084 added)"
+        - "git commit (phase 3); no push in this session"
+        - "Read-only export of this session via src/build/sexport at phase end (after the commit); sha256 recorded in the local README"
+    network_writes: []
+    original_session_id: ses_e27efbad7ffeY2pIG6EzRIOgOQ
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-14-phase3-pdf.json
+      (raw OpenCode session export retained outside git; one continuous
+      session with B-AI-008/009/010, captured at phase end after the commit;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: true
+    notes: >-
+      No real OCR runtime, cloud OCR endpoint, provider or token was used; no
+      browser. All OCR tests use a fake local runtime (CommandRunner) and a
+      fake httptest cloud job API; the only token-like string is a synthetic
+      test fixture proving redaction. The native extractor is the vetted
+      pure-Go github.com/ledongthuc/pdf (BSD-3-Clause, zero dependencies,
+      pinned pseudo-version; license recorded in docs/licenses). The only
+      network activity was a Go module proxy read to fetch that library and
+      npm registry reads during the unchanged frontend gate; no push and no
+      GitHub API write. Cloud OCR is feature-flagged off and requires recorded
+      consent before any upload; local OCR is the default and never falls back
+      to cloud silently. Migration 082 is additive/idempotent; no published
+      migration was edited. Implementation acceptance and APPROVE remain
+      human non-author actions.
