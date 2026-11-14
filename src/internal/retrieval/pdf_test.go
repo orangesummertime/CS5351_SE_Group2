@@ -322,6 +322,61 @@ func TestBT37_LocalFirstOCR(t *testing.T) {
 	}
 }
 
+// TestPDFMixedBlankTextPreservedWithoutOCR: a PDF with one blank page and one
+// searchable text page keeps the usable native text when OCR cannot run (no
+// provider — the application wiring — an unavailable runtime, or cloud
+// without enablement/consent). The skipped pages are reported honestly in
+// Reason and no OCR/cloud call happens. An all-blank document still reports
+// pdf_ocr_unavailable without storing, so installing the runtime later can
+// still extract on the next save.
+func TestPDFMixedBlankTextPreservedWithoutOCR(t *testing.T) {
+	hash := strings.Repeat("e7", 32)
+	ctx := context.Background()
+	for _, tc := range []struct {
+		name       string
+		cfg        PDFExtractionConfig
+		wantReason string
+	}{
+		{"no provider (app wiring)", PDFExtractionConfig{OCRMode: OCRModeLocal}, "local OCR runtime/model unavailable"},
+		{"unavailable runtime", PDFExtractionConfig{OCRMode: OCRModeLocal, OCR: &fakeOCR{name: "local-paddleocr", available: false}}, "local OCR runtime/model unavailable"},
+		{"cloud without consent", PDFExtractionConfig{OCRMode: OCRModeCloud, OCR: &fakeOCR{name: "paddleocr-cloud", available: true}}, "no upload performed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := newFakePDFStore()
+			doc := pdfDoc(hash, "", "The answer is BANANA-42 on page two.")
+			svc := NewPDFExtractionService(&fakeExtractor{hash: hash, doc: doc}, store, store, tc.cfg)
+			got, err := svc.Extract(ctx, "pdf:"+hash, "/tmp/mixed.pdf", 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got.Status != PDFStatusReady || got.OCRUsed {
+				t.Fatalf("mixed PDF must stay ready with native text: %+v", got)
+			}
+			if !strings.Contains(got.Reason, tc.wantReason) || !strings.Contains(got.Reason, "1 page(s) without a text layer were left empty") {
+				t.Fatalf("limitation must be reported honestly: %q", got.Reason)
+			}
+			stored, _ := store.Pages(ctx, "pdf:"+hash)
+			if len(stored) != 2 || strings.TrimSpace(stored[0].Text) != "" || stored[1].Text != "The answer is BANANA-42 on page two." {
+				t.Fatalf("native page text must be preserved: %+v", stored)
+			}
+			if store.saves != 1 {
+				t.Fatalf("pages must be stored exactly once: %d", store.saves)
+			}
+			if ocr, ok := tc.cfg.OCR.(*fakeOCR); ok && ocr.calls != 0 {
+				t.Fatalf("no OCR call allowed: %d", ocr.calls)
+			}
+		})
+	}
+
+	// All-blank + unavailable OCR: explicit unavailable, nothing stored.
+	store := newFakePDFStore()
+	svc := NewPDFExtractionService(&fakeExtractor{hash: hash, doc: pdfDoc(hash, "", "")}, store, store, PDFExtractionConfig{OCRMode: OCRModeLocal})
+	got, err := svc.Extract(ctx, "pdf:"+hash, "/tmp/blank.pdf", 1)
+	if err != nil || got.Status != PDFStatusOCRUnavailable || store.saves != 0 {
+		t.Fatalf("all-blank without OCR: %+v saves=%d err=%v", got, store.saves, err)
+	}
+}
+
 // TestPDFExtractionConcurrency: at most one active extraction per
 // content+hash; a concurrent call reports pdf_extracting.
 func TestPDFExtractionConcurrency(t *testing.T) {

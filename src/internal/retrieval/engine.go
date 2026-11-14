@@ -15,7 +15,8 @@ type Engine struct {
 	Source    PassageSource
 	Embedder  Embedder // nil → lexical-only
 	Assembler ContextAssembler
-	mu        sync.Mutex // guards Embedder swaps (settings save)
+	Settings  *EmbeddingSettings // saved operational settings; nil → built-in defaults
+	mu        sync.Mutex         // guards Embedder/Settings swaps (settings save)
 }
 
 // SetEmbedder replaces the embedding adapter at runtime (saved settings take
@@ -25,6 +26,65 @@ func (e *Engine) SetEmbedder(emb Embedder) {
 	e.mu.Lock()
 	e.Embedder = emb
 	e.mu.Unlock()
+}
+
+// ApplySettings atomically replaces the saved operational settings and the
+// embedding adapter so a settings save takes effect without a restart and no
+// run observes a half-applied save. A nil settings pointer restores the
+// built-in defaults; a nil embedder falls back to lexical-only. Each Run
+// snapshots both, so an in-flight run keeps its configuration.
+func (e *Engine) ApplySettings(settings *EmbeddingSettings, emb Embedder) {
+	e.mu.Lock()
+	e.Settings = settings
+	e.Embedder = emb
+	e.mu.Unlock()
+}
+
+// runBudget is the resolved operational budget for one invocation.
+type runBudget struct {
+	maxRequests int
+	embChars    int
+	batchSize   int
+	topK        int
+	weights     Weights
+}
+
+// resolveRunBudget merges the saved settings with the request overrides.
+// Saved settings are the baseline: request/character limits, batch size,
+// topK and scoring weights come from what the user saved, not hardcoded
+// engine values. Explicit request overrides may only tighten the saved
+// limits — an omitted field keeps the saved value, a present value is capped
+// by it, and a saved 0 (embedding off) is never re-enabled by the client's
+// defaults. Without saved settings the built-in mode-aware defaults apply
+// and request values are preserved as-is, including an explicit 0 (budget
+// contract: zero = off, never silently replaced by the default).
+func resolveRunBudget(saved *EmbeddingSettings, batchMode BatchingMode, wire EmbeddingBudgetWire) runBudget {
+	b := runBudget{maxRequests: 24, embChars: 100000, batchSize: 8, topK: 100, weights: DefaultWeights()}
+	if batchMode == BatchingSplit {
+		b.maxRequests = 25
+	}
+	if saved != nil {
+		b.maxRequests = saved.MaxEmbeddingRequests
+		if saved.MaxEmbeddingChars > 0 {
+			b.embChars = saved.MaxEmbeddingChars
+		}
+		if saved.BatchSize > 0 {
+			b.batchSize = saved.BatchSize
+		}
+		if saved.TopK > 0 {
+			b.topK = saved.TopK
+		}
+		if w, err := ValidateWeights(Weights{Lexical: saved.LexicalWeight, Embedding: saved.EmbeddingWeight, Rerank: saved.RerankWeight}); err == nil {
+			b.weights = w
+		}
+	}
+	if wire.MaxRequests != nil && (saved == nil || *wire.MaxRequests < b.maxRequests) {
+		b.maxRequests = *wire.MaxRequests
+	}
+	if wire.MaxChars > 0 && (saved == nil || wire.MaxChars < b.embChars) {
+		b.embChars = wire.MaxChars
+	}
+	return b
 }
 
 // RunInput feeds one retrieval operation.
@@ -77,6 +137,7 @@ func (b *budgetedEmbedder) Embed(ctx context.Context, texts []string, role Embed
 func (e *Engine) Run(ctx context.Context, in RunInput) (RunResult, error) {
 	e.mu.Lock()
 	embedder := e.Embedder
+	saved := e.Settings
 	e.mu.Unlock()
 	asm := e.Assembler
 	if asm == nil {
@@ -95,7 +156,8 @@ func (e *Engine) Run(ctx context.Context, in RunInput) (RunResult, error) {
 		return RunResult{Response: Response{SchemaVersion: WireSchemaVersion, Status: status}}, StatusError{Status: status}
 	}
 
-	// Build the embedding budget + mode from the request (defaults applied).
+	// Build the embedding budget + mode from the saved settings and the
+	// request (saved limits are the baseline; request overrides only tighten).
 	mode := in.Request.Mode
 	if mode == "" {
 		mode = ModeHybrid
@@ -106,38 +168,24 @@ func (e *Engine) Run(ctx context.Context, in RunInput) (RunResult, error) {
 	} else if embedder != nil {
 		batchMode = embedder.BatchingMode()
 	}
-	// An omitted maxRequests uses the mode default; an explicit value is
-	// preserved as-is, including 0, which turns embedding off (budget
-	// contract: zero = off, never silently replaced by the default).
-	maxRequests := 24
-	if batchMode == BatchingSplit {
-		maxRequests = 25
-	}
-	if in.Request.EmbeddingBudget.MaxRequests != nil {
-		maxRequests = *in.Request.EmbeddingBudget.MaxRequests
-	}
-	embChars := in.Request.EmbeddingBudget.MaxChars
-	if embChars == 0 {
-		embChars = 100000
-	}
+	budget := resolveRunBudget(saved, batchMode, in.Request.EmbeddingBudget)
 	sweepCandidates := in.Request.EmbeddingBudget.SweepCandidates
 	if sweepCandidates == 0 && in.Request.EmbeddingBudget.MaxRequests != nil {
 		sweepCandidates = 90
 	}
-	topK := 100
 
 	var emb Embedder
 	var tracker *BudgetTracker
 	if embedder != nil && mode != ModeLexical {
-		tracker = NewBudgetTracker(maxRequests, embChars)
+		tracker = NewBudgetTracker(budget.maxRequests, budget.embChars)
 		emb = &budgetedEmbedder{inner: embedder, tracker: tracker}
 	}
 
 	cfg := SelectorConfig{
-		TopK:                topK,
+		TopK:                budget.topK,
 		Sweep:               SweepConfig{Enabled: embedder != nil, SweepCandidates: sweepCandidates},
-		Budget:              BudgetConfig{Mode: batchMode, MaxRequests: maxRequests, BatchSize: 8, TopK: topK, SweepCandidates: sweepCandidates, MaxEmbeddingChars: embChars},
-		Weights:             DefaultWeights(),
+		Budget:              BudgetConfig{Mode: batchMode, MaxRequests: budget.maxRequests, BatchSize: budget.batchSize, TopK: budget.topK, SweepCandidates: sweepCandidates, MaxEmbeddingChars: budget.embChars},
+		Weights:             budget.weights,
 		AssemblyBudgetRunes: maxChars,
 		MaxBytes:            DefaultMaxBytes,
 		Mode:                mode,

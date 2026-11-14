@@ -2,6 +2,7 @@ package retrieval
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 )
@@ -94,7 +95,10 @@ type PDFExtractionResult struct {
 // PDFExtractionService orchestrates: hash → idempotency check → native
 // extraction → OCR fallback for text-less pages → page-count validation →
 // store. At most one active extraction per content+hash; a concurrent call
-// reports pdf_extracting. No passage is ever fabricated.
+// reports pdf_extracting. No passage is ever fabricated. When OCR cannot run
+// (runtime unavailable, or cloud without enablement/consent), usable native
+// page text is preserved and the skipped pages are reported in Reason; only
+// a document with no usable text at all reports pdf_ocr_unavailable.
 type PDFExtractionService struct {
 	extractor PDFTextExtractor
 	reader    PDFText
@@ -159,27 +163,29 @@ func (s *PDFExtractionService) Extract(ctx context.Context, contentID, path stri
 		}
 	}
 	ocrUsed := false
+	ocrReason := ""
 	if len(missing) > 0 && s.cfg.OCRMode != OCRModeOff {
-		if s.cfg.OCRMode == OCRModeCloud && !s.cloudAllowed() {
-			return PDFExtractionResult{Status: PDFStatusOCRUnavailable, Reason: "cloud OCR requires explicit enablement and consent; no upload performed", DocumentSHA256: hash}, nil
+		switch {
+		case s.cfg.OCRMode == OCRModeCloud && !s.cloudAllowed():
+			ocrReason = "cloud OCR requires explicit enablement and consent; no upload performed"
+		case s.cfg.OCR == nil || !s.cfg.OCR.Available(ctx):
+			ocrReason = "local OCR runtime/model unavailable"
+		default:
+			res, err := s.cfg.OCR.Recognize(ctx, path, len(missing))
+			if err != nil {
+				return PDFExtractionResult{Status: PDFStatusExtractFailed, Reason: "OCR failed", DocumentSHA256: hash}, nil
+			}
+			if len(res.Pages) != len(missing) {
+				return PDFExtractionResult{Status: PDFStatusExtractFailed, Reason: "OCR page-count mismatch", DocumentSHA256: hash}, nil
+			}
+			for k, idx := range missing {
+				doc.Pages[idx].Text = res.Pages[k].Text
+				doc.Pages[idx].Extractor = s.cfg.OCR.Name()
+				doc.Pages[idx].ExtractorVersion = s.cfg.OCR.Version()
+			}
+			doc.OCRJobID, doc.OCRState = res.JobID, res.State
+			ocrUsed = true
 		}
-		if s.cfg.OCR == nil || !s.cfg.OCR.Available(ctx) {
-			return PDFExtractionResult{Status: PDFStatusOCRUnavailable, Reason: "local OCR runtime/model unavailable", DocumentSHA256: hash}, nil
-		}
-		res, err := s.cfg.OCR.Recognize(ctx, path, len(missing))
-		if err != nil {
-			return PDFExtractionResult{Status: PDFStatusExtractFailed, Reason: "OCR failed", DocumentSHA256: hash}, nil
-		}
-		if len(res.Pages) != len(missing) {
-			return PDFExtractionResult{Status: PDFStatusExtractFailed, Reason: "OCR page-count mismatch", DocumentSHA256: hash}, nil
-		}
-		for k, idx := range missing {
-			doc.Pages[idx].Text = res.Pages[k].Text
-			doc.Pages[idx].Extractor = s.cfg.OCR.Name()
-			doc.Pages[idx].ExtractorVersion = s.cfg.OCR.Version()
-		}
-		doc.OCRJobID, doc.OCRState = res.JobID, res.State
-		ocrUsed = true
 	}
 
 	allEmpty := true
@@ -189,13 +195,25 @@ func (s *PDFExtractionService) Extract(ctx context.Context, contentID, path stri
 			break
 		}
 	}
+	if allEmpty && ocrReason != "" {
+		// No usable native text and OCR could not run: keep the explicit
+		// unavailable status without storing, so installing the OCR runtime
+		// later still allows extraction on the next save.
+		return PDFExtractionResult{Status: PDFStatusOCRUnavailable, Reason: ocrReason, DocumentSHA256: hash}, nil
+	}
 	if err := s.store.SavePDFPages(ctx, contentID, doc, extractedAt); err != nil {
 		return PDFExtractionResult{}, err
 	}
 	if allEmpty {
 		return PDFExtractionResult{Status: PDFStatusNoText, DocumentSHA256: hash, PageCount: doc.PageCount, Pages: doc.Pages, OCRUsed: ocrUsed}, nil
 	}
-	return resultFromPages(hash, doc.Pages, ocrUsed), nil
+	result := resultFromPages(hash, doc.Pages, ocrUsed)
+	if ocrReason != "" {
+		// Usable native text is preserved and searchable; the skipped pages
+		// are reported honestly instead of discarding the whole document.
+		result.Reason = fmt.Sprintf("%s; %d page(s) without a text layer were left empty", ocrReason, len(missing))
+	}
+	return result, nil
 }
 
 // cloudAllowed requires the feature flag AND recorded consent; cloud is off

@@ -32,8 +32,9 @@ func (s *retrievalSettingsService) Get(ctx context.Context) (retrieval.MaskedSet
 	return settings.Mask(), nil
 }
 
-// Save validates and persists the configuration, then rebuilds the embedding
-// adapter so the next retrieval invocation uses it. Invalid settings are
+// Save validates and persists the configuration, then applies the operational
+// settings (limits, batch size, topK, weights) and rebuilds the embedding
+// adapter so the next retrieval invocation uses both. Invalid settings are
 // rejected before anything is written or swapped.
 func (s *retrievalSettingsService) Save(ctx context.Context, input retrieval.EmbeddingSettings) (retrieval.MaskedSettings, error) {
 	stored, err := s.store.LoadRetrievalSettings(ctx)
@@ -50,7 +51,7 @@ func (s *retrievalSettingsService) Save(ctx context.Context, input retrieval.Emb
 		return retrieval.MaskedSettings{}, err
 	}
 	if s.engine != nil {
-		s.engine.SetEmbedder(newEmbeddingAdapter(input))
+		s.engine.ApplySettings(&input, newEmbeddingAdapter(input))
 	}
 	return input.Mask(), nil
 }

@@ -47,7 +47,7 @@ func (p *integrationChatProvider) snapshot() (int, string) {
 func newIntegrationApp(t *testing.T, provider ai.Translator) *Application {
 	t.Helper()
 	root := t.TempDir()
-	for name, value := range map[string]string{"TANGENTRY_DOWNLOAD_DIR": filepath.Join(root, "downloads"), "TANGENTRY_YTDLP_PATH": filepath.Join(root, "absent-tool"), "TANGENTRY_FFMPEG_PATH": filepath.Join(root, "absent-tool"), "TANGENTRY_BILIBILI_COOKIE_FILE": "", "TANGENTRY_BILIBILI_COOKIE": ""} {
+	for name, value := range map[string]string{"TANGENTRY_DOWNLOAD_DIR": filepath.Join(root, "downloads"), "TANGENTRY_YTDLP_PATH": filepath.Join(root, "absent-tool"), "TANGENTRY_FFMPEG_PATH": filepath.Join(root, "absent-tool"), "TANGENTRY_BILIBILI_COOKIE_FILE": "", "TANGENTRY_BILIBILI_COOKIE": "", "TANGENTRY_PADDLEOCR_PATH": filepath.Join(root, "absent-tool"), "TANGENTRY_PADDLEOCR_MODEL": filepath.Join(root, "absent-model")} {
 		t.Setenv(name, value)
 	}
 	application, err := New(root, fstest.MapFS{}, Options{AITranslator: provider})
@@ -230,13 +230,15 @@ func TestPDFImportExtractionRetrievalThroughApp(t *testing.T) {
 }
 
 // integrationEmbeddingServer is a fake OpenAI-compatible embedding endpoint
-// recording model identity and authorization for the settings-use test.
+// recording model identity, authorization and batch sizes for the
+// settings-use tests.
 type integrationEmbeddingServer struct {
 	server   *httptest.Server
 	mu       sync.Mutex
 	requests int
 	models   []string
 	auths    []string
+	batches  []int
 }
 
 func newIntegrationEmbeddingServer(t *testing.T) *integrationEmbeddingServer {
@@ -252,6 +254,7 @@ func newIntegrationEmbeddingServer(t *testing.T) *integrationEmbeddingServer {
 		s.requests++
 		s.models = append(s.models, body.Model)
 		s.auths = append(s.auths, r.Header.Get("Authorization"))
+		s.batches = append(s.batches, len(body.Input))
 		s.mu.Unlock()
 		data := make([]map[string]any, len(body.Input))
 		for i := range body.Input {
@@ -269,6 +272,12 @@ func (s *integrationEmbeddingServer) snapshot() (int, []string, []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.requests, append([]string(nil), s.models...), append([]string(nil), s.auths...)
+}
+
+func (s *integrationEmbeddingServer) batchSizes() []int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return append([]int(nil), s.batches...)
 }
 
 // TestRetrievalSettingsSaveReloadUseThroughApp: the settings panel contract
@@ -388,5 +397,150 @@ func TestRetrievalSettingsSaveReloadUseThroughApp(t *testing.T) {
 	}
 	if masked.Model != "custom-embed-model" || !masked.HasKey {
 		t.Fatalf("rejected save must not alter stored settings: %s", reloaded)
+	}
+}
+
+// TestRetrievalSettingsLimitsAppliedThroughApp: the saved operational
+// settings reach the actual chat invocation. Saving maxEmbeddingRequests=0
+// prevents every embedding POST even though the ordinary frontend request
+// supplies its own default 24 requests / 100000 chars; a non-default saved
+// configuration (request cap, batch size, topK, char budget) is then used by
+// the next chat without a restart.
+func TestRetrievalSettingsLimitsAppliedThroughApp(t *testing.T) {
+	provider := &integrationChatProvider{}
+	application := newIntegrationApp(t, provider)
+	revision := configureIntegrationAI(t, application)
+	pages := make([]string, 6)
+	for i := range pages {
+		pages[i] = fmt.Sprintf("The secret answer is BANANA-42 on page %d.", i+1)
+	}
+	contentID := uploadIntegrationPDF(t, application, integrationPDF(t, pages))
+
+	embeddings := newIntegrationEmbeddingServer(t)
+	settings := map[string]any{
+		"providerKind": "remote", "surface": "openai", "baseUrl": embeddings.server.URL,
+		"apiKey": "integration-test-key", "model": "custom-embed-model", "dimensions": 4,
+		"batchSize": 8, "textType": "", "instruct": "", "encodingFormat": "float",
+		"timeoutMs": 5000, "topK": 100,
+		"lexicalWeight": 0.35, "embeddingWeight": 0.65, "rerankWeight": 0,
+		"maxEmbeddingRequests": 0, "maxEmbeddingChars": 100000, "maxRerankRequests": 0,
+		"rerankProvider": "off", "rerankModel": "", "rerankBaseUrl": "", "rerankApiKey": "",
+		"rerankTopN": 0, "rerankInstruct": "",
+	}
+	integrationJSON(t, application, "PUT", "/api/ai/retrieval/settings", settings, 200)
+
+	// The ordinary UI request carries its own defaults (24/100000/90); the
+	// saved zero must still prevent every embedding POST.
+	chatBody := map[string]any{
+		"contentId": contentID, "revision": revision, "model": "fixture",
+		"messages": []map[string]string{{"role": "user", "content": "BANANA-42"}},
+		"retrieval": map[string]any{
+			"schemaVersion": 1, "enabled": true, "mode": "hybrid", "maxChars": 120000,
+			"embeddingBudget": map[string]any{"batchingMode": "shared", "maxRequests": 24, "maxChars": 100000, "sweepCandidates": 90},
+			"rerankBudget":    map[string]any{"maxRequests": 0},
+		},
+	}
+	var result struct {
+		Retrieval *struct {
+			Status    string `json:"status"`
+			Passages  []any  `json:"passages"`
+			Embedding struct {
+				Model        string `json:"model"`
+				BudgetStatus string `json:"budgetStatus"`
+				Requests     int    `json:"requests"`
+			} `json:"embedding"`
+		} `json:"retrieval"`
+	}
+	body := integrationJSON(t, application, "POST", "/api/ai/chat", chatBody, 200)
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Retrieval == nil || result.Retrieval.Status != "lexical_only" || len(result.Retrieval.Passages) == 0 {
+		t.Fatalf("saved zero must keep lexical retrieval working: %s", body)
+	}
+	if result.Retrieval.Embedding.BudgetStatus != "disabled" || result.Retrieval.Embedding.Requests != 0 {
+		t.Fatalf("saved zero must disable the embedding budget: %s", body)
+	}
+	if requests, _, _ := embeddings.snapshot(); requests != 0 {
+		t.Fatalf("saved zero allowed %d embedding POSTs, want 0", requests)
+	}
+
+	// A non-default saved configuration is applied to the next chat: the
+	// request cap 2 and batch size 2 beat the frontend's 24/8 defaults.
+	settings["maxEmbeddingRequests"] = 2
+	settings["batchSize"] = 2
+	settings["topK"] = 20
+	settings["maxEmbeddingChars"] = 50000
+	integrationJSON(t, application, "PUT", "/api/ai/retrieval/settings", settings, 200)
+	body = integrationJSON(t, application, "POST", "/api/ai/chat", chatBody, 200)
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Retrieval == nil || len(result.Retrieval.Passages) == 0 {
+		t.Fatalf("hybrid retrieval must return passages: %s", body)
+	}
+	if result.Retrieval.Embedding.Model != "custom-embed-model" || result.Retrieval.Embedding.Requests != 2 {
+		t.Fatalf("saved request cap must shape the run: %s", body)
+	}
+	requests, _, _ := embeddings.snapshot()
+	if requests != 2 {
+		t.Fatalf("saved request cap 2 must beat the frontend default 24: %d POSTs (%s)", requests, body)
+	}
+	for i, size := range embeddings.batchSizes() {
+		if size > 2 {
+			t.Fatalf("POST %d sent %d texts, saved batchSize is 2", i, size)
+		}
+	}
+}
+
+// TestPDFMixedBlankPagesRemainSearchable: a PDF with one blank page and one
+// searchable text page imports through the real endpoint and stays
+// retrievable even though no OCR runtime is installed (local OCR
+// unavailable; cloud upload is never enabled). The usable native page text
+// is preserved instead of being discarded with the blank page.
+func TestPDFMixedBlankPagesRemainSearchable(t *testing.T) {
+	provider := &integrationChatProvider{}
+	application := newIntegrationApp(t, provider)
+	revision := configureIntegrationAI(t, application)
+	contentID := uploadIntegrationPDF(t, application, integrationPDF(t, []string{
+		"",
+		"The secret answer is BANANA-42 on page two.",
+	}))
+
+	body := integrationJSON(t, application, "POST", "/api/ai/chat", map[string]any{
+		"contentId": contentID, "revision": revision, "model": "fixture",
+		"messages":  []map[string]string{{"role": "user", "content": "BANANA-42"}},
+		"retrieval": map[string]any{"schemaVersion": 1, "enabled": true, "mode": "lexical"},
+	}, 200)
+	var result struct {
+		Retrieval *struct {
+			Status   string `json:"status"`
+			Passages []struct {
+				Source  string `json:"source"`
+				Locator string `json:"locator"`
+			} `json:"passages"`
+		} `json:"retrieval"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Retrieval == nil || result.Retrieval.Status != "lexical_only" || len(result.Retrieval.Passages) == 0 {
+		t.Fatalf("mixed blank/text PDF must remain searchable: %s", body)
+	}
+	foundAnswer := false
+	for _, p := range result.Retrieval.Passages {
+		if p.Source != "pdf" || !strings.HasPrefix(p.Locator, "pdf:") {
+			t.Fatalf("passage provenance: %+v", p)
+		}
+		if strings.Contains(p.Locator, ":2:") {
+			foundAnswer = true
+		}
+	}
+	if !foundAnswer {
+		t.Fatalf("text page passage missing: %s", body)
+	}
+	calls, source := provider.snapshot()
+	if calls != 1 || !strings.Contains(source, "BANANA-42") {
+		t.Fatalf("chat calls=%d, provider source must contain the preserved page text: %q", calls, source)
 	}
 }

@@ -83,7 +83,8 @@ func newLanguageAI(dataDir string, results ai.ResultStore, option Options) *ai.S
 
 // newRetrievalEngine wires B's retrieval engine: the SQLite passage source,
 // the configured embedding adapter (local-first; nil if settings invalid →
-// lexical-only), a process-local vector cache (default) and the assembler.
+// lexical-only), the saved operational settings (limits, batch size, topK,
+// weights), a process-local vector cache (default) and the assembler.
 // The persistent SQLite cache (migration 083) is available as an opt-in.
 func newRetrievalEngine(store *sqlite.Store) *retrieval.Engine {
 	source := sqlite.NewRetrievalSource(store)
@@ -91,7 +92,13 @@ func newRetrievalEngine(store *sqlite.Store) *retrieval.Engine {
 	if err != nil {
 		settings = retrieval.DefaultEmbeddingSettings()
 	}
-	return &retrieval.Engine{Source: source, Embedder: newEmbeddingAdapter(settings), Assembler: retrieval.NewContextAssembler()}
+	engine := &retrieval.Engine{Source: source, Embedder: newEmbeddingAdapter(settings), Assembler: retrieval.NewContextAssembler()}
+	// Invalid stored settings stay lexical-only (nil adapter), never a
+	// half-configured budget.
+	if retrieval.ValidateEmbeddingSettings(settings) == nil {
+		engine.Settings = &settings
+	}
+	return engine
 }
 
 // newEmbeddingAdapter builds the embedding adapter for validated settings.
@@ -108,16 +115,27 @@ func newEmbeddingAdapter(settings retrieval.EmbeddingSettings) retrieval.Embedde
 
 // newPDFExtraction wires the extraction service for the saved-PDF flow: the
 // vetted native text-layer extractor with the SQLite page-text store. OCR is
-// local-first (user-installed runtime, no upload); cloud OCR stays disabled
-// here — it requires explicit enablement plus recorded consent, and is never
-// a silent fallback.
+// local-first: the user-installed PaddleOCR runtime (environment overrides,
+// never silently downloaded, no upload). Without the runtime the service
+// preserves the native text of searchable pages and reports the limitation;
+// cloud OCR stays disabled here — it requires explicit enablement plus
+// recorded consent, and is never a silent fallback.
 func newPDFExtraction(store *sqlite.Store) *retrieval.PDFExtractionService {
-	return retrieval.NewPDFExtractionService(pdftext.NativeExtractor{}, store, store, retrieval.PDFExtractionConfig{OCRMode: retrieval.OCRModeLocal})
+	ocr := &pdftext.LocalOCR{
+		Cfg: pdftext.LocalOCRConfig{
+			RuntimePath: os.Getenv("TANGENTRY_PADDLEOCR_PATH"),
+			ModelPath:   os.Getenv("TANGENTRY_PADDLEOCR_MODEL"),
+		},
+		Runner: pdftext.ExecRunner{},
+	}
+	return retrieval.NewPDFExtractionService(pdftext.NativeExtractor{}, store, store, retrieval.PDFExtractionConfig{OCRMode: retrieval.OCRModeLocal, OCR: ocr})
 }
 
 // extractSavedPDF populates the server-side page text for a saved PDF so
 // retrieval can read it. Failures are logged, never fatal to the save: the
 // retrieval pipeline reports the explicit PDF status on the next request.
+// A partial extraction (OCR unavailable for text-less pages) keeps the
+// usable native text and logs the limitation.
 func extractSavedPDF(ctx context.Context, extraction *retrieval.PDFExtractionService, documents *filesystem.Documents, item content.Item) {
 	if item.Kind != "pdf" {
 		return
@@ -135,7 +153,9 @@ func extractSavedPDF(ctx context.Context, extraction *retrieval.PDFExtractionSer
 		return
 	}
 	if result.Status != retrieval.PDFStatusReady {
-		slog.Info("PDF text extraction incomplete", "contentId", item.ID, "status", result.Status)
+		slog.Info("PDF text extraction incomplete", "contentId", item.ID, "status", result.Status, "reason", result.Reason)
+	} else if result.Reason != "" {
+		slog.Info("PDF text extraction limited", "contentId", item.ID, "reason", result.Reason)
 	}
 }
 
