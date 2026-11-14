@@ -122,18 +122,19 @@ seeing results; no question was dropped; budgets were not altered mid-run.
     "OCR subset provisional: expected-text fixture only; real PaddleOCR run pending (runtime unavailable)"
   ],
   "open_questions": [
-    "PR owner/b-implementation → main with full evidence package; non-author human review required (do NOT self-approve/merge)",
+    "PR #7 opened (https://github.com/orangesummertime/CS5351_SE_Group2/pull/7); non-author human review required (do NOT self-approve/merge) — reviewer arranged by the human owner",
     "OCR subset: install local PaddleOCR, render scanned pages, verify recognized text, then confirm BQ-025/026 labels",
     "Optional: repeat the evaluation with a pinned local bge-m3 to remove the provider deviation"
   ],
-  "next_phase": "post-Phase-7: human review + PR (implementation phases 0-7 complete)",
+  "next_phase": "post-Phase-7: non-author human review of PR #7 + merge decision (implementation phases 0-7 complete)",
   "claim_tags": "every factual claim above is VERIFIED by cited evidence logs/files; recall numbers come from the frozen replay, not estimates"
 }
 ```
 
 ## 6. Stop condition
 
-Phase 7 ends here. Implementation Phases 0–7 are complete. Per the plan, the
-next step is opening PR `owner/b-implementation → main` with the full evidence
-package and requesting **non-author human review** — the agent does not
-self-approve or merge, and no push was made in this session.
+Phase 7 ends here. Implementation Phases 0–7 are complete. PR
+`owner/b-implementation → main` was opened at the human owner's request:
+**https://github.com/orangesummertime/CS5351_SE_Group2/pull/7** (9 commits,
+full evidence package). **Non-author human review** is arranged by the owner;
+the agent does not self-approve or merge.

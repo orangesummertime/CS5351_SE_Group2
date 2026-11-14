@@ -398,5 +398,7 @@ load/split → lexical → sweep → embed → dedupe/verify.
   out of the primary denominator.
 - This is sentence/segment recall, not answer correctness; C's citation
   verification and D's comparison quality are separate.
-- PR `owner/b-implementation → main` + non-author human review remain the
-  next human actions; no push in this session.
+- PR opened at the owner's request:
+  https://github.com/orangesummertime/CS5351_SE_Group2/pull/7 — non-author
+  human review is arranged by the owner; the agent does not self-approve or
+  merge.
