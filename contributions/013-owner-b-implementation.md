@@ -54,3 +54,51 @@ schema after the edit.
   Phase 7 waits for that set; no questions or labels are invented.
 - Network activity: read-only GitHub API GETs and npm registry reads only; no
   push, no provider call, no browser.
+
+## Phase 1 — domain core (2026-11-14)
+
+### What changed
+
+New stdlib-only domain package `src/internal/retrieval/` implementing the
+approved ADR-002/plan contracts: exact plan domain types (`Passage`,
+`Selection`, `Embedder`, `PassageSelector`, `ContextAssembler`, …) and ports
+(`PassageSource`, `PDFText`); sentence/segment splitter (CJK+Latin
+terminators, abbreviations, quotes, code fences, emoji; 1–3 sentences /
+200–800 runes; subtitle cue groups 3–8 cues / 15–60 s; headings/pages never
+crossed); deterministic lexical scorer (exact phrase, distinct-term coverage,
+saturating TF, proximity); unconditional position-stratified sweep sampler
+(indices `floor(k*N/S)`, `Stride=ceil(N/S)`, `Coverage=S/N`); mode-aware
+proportional capped budget mathematics with code-asserted invariants; hybrid
+scoring with weight validation/normalization and the stable tie-break;
+whitespace-normalized dedupe; six-layer assembler (rune + 200,000-byte caps,
+drop sequence, degraded 8k profile, constraint re-injection); INV-04 preflight
+and INV-05 re-read verifier; selector orchestrating validate → preflight →
+load/split → lexical → sweep → embed → dedupe/verify.
+
+### Verification (test-first; raw logs retained)
+
+- First run RED: 8 failure groups recorded in
+  `docs/evidence/b-impl-phase1-red.log`; fixed within phase scope
+  (implementation bugs: ellipsis re-scan, grouping min-check order, wrapped
+  sentinel comparison, zero-capacity lexical fallback, reminder re-injection
+  flag; plus documented test-expectation corrections).
+- GREEN: 31 test functions covering B-T02, B-T06, B-T08, B-T10, B-T14, B-T15,
+  B-T16, B-T17, B-T19, B-T21 (both halves), B-T22, B-T29, B-T39, B-T40 (A/B/C)
+  plus budget worked examples, sweep/weights/dedupe/no-match/empty-input/
+  embedder-failure/determinism (`b-impl-phase1-retrieval.log`).
+- Gates: focused packages exit 0 (`b-impl-phase1-focused.log`); full Go suite
+  44 ok / 11 no-test exit 0 (`b-impl-phase1-go-full.log`); layering + vet +
+  A-budget empty-diff proof (`b-impl-phase1-layering.log`); frontend unchanged
+  62 files / 251 tests + build exit 0 (`b-impl-phase1-web.log`); two-run
+  determinism diff identical (`b-impl-phase1-determinism.log`).
+- Phase report: `docs/evidence/b-impl-phase1-report.md`.
+
+### Limits
+
+- Adapters (SQLite source, PDF, embedding/rerank), transport and frontend are
+  later phases; the domain is exercised through fakes only. Fake hash vectors
+  are unit-test-only, never an NFR-02 claim. B-T33's full fake-transport mode
+  matrix runs in Phase 4 (budget math half already reproduced here).
+- NFC normalization is deferred (stdlib-only constraint); matching uses
+  lowercase + whitespace/line-ending normalization on precomposed fixtures.
+- No recall measurement yet; Phase 7 waits for WANG Jiaqi's evaluation set.
