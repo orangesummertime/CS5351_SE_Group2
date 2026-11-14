@@ -3,6 +3,7 @@ package retrieval
 import (
 	"context"
 	"strings"
+	"sync"
 )
 
 // Engine orchestrates the retrieval pipeline for the AI service: validate
@@ -14,6 +15,16 @@ type Engine struct {
 	Source    PassageSource
 	Embedder  Embedder // nil → lexical-only
 	Assembler ContextAssembler
+	mu        sync.Mutex // guards Embedder swaps (settings save)
+}
+
+// SetEmbedder replaces the embedding adapter at runtime (saved settings take
+// effect without a restart). A nil embedder falls back to lexical-only. Each
+// Run snapshots the current embedder, so an in-flight run keeps its adapter.
+func (e *Engine) SetEmbedder(emb Embedder) {
+	e.mu.Lock()
+	e.Embedder = emb
+	e.mu.Unlock()
 }
 
 // RunInput feeds one retrieval operation.
@@ -51,6 +62,12 @@ func (b *budgetedEmbedder) Embed(ctx context.Context, texts []string, role Embed
 		chars += RuneLen(t)
 	}
 	b.tracker.AddChars(chars)
+	// Adapters that report usage validity mark this invocation's tracker
+	// directly (missing usage stops later batches); the slot above is the
+	// only reservation, so no double counting occurs.
+	if aware, ok := b.inner.(UsageReportingEmbedder); ok {
+		return aware.EmbedWithUsage(ctx, texts, role, b.tracker)
+	}
 	return b.inner.Embed(ctx, texts, role)
 }
 
@@ -58,6 +75,9 @@ func (b *budgetedEmbedder) Embed(ctx context.Context, texts []string, role Embed
 // (status + any spent embedding counts) and a StatusError is returned so the
 // caller starts zero chat requests.
 func (e *Engine) Run(ctx context.Context, in RunInput) (RunResult, error) {
+	e.mu.Lock()
+	embedder := e.Embedder
+	e.mu.Unlock()
 	asm := e.Assembler
 	if asm == nil {
 		asm = NewContextAssembler()
@@ -83,37 +103,39 @@ func (e *Engine) Run(ctx context.Context, in RunInput) (RunResult, error) {
 	batchMode := BatchingShared
 	if in.Request.EmbeddingBudget.BatchingMode == string(BatchingSplit) {
 		batchMode = BatchingSplit
-	} else if e.Embedder != nil {
-		batchMode = e.Embedder.BatchingMode()
+	} else if embedder != nil {
+		batchMode = embedder.BatchingMode()
 	}
-	maxRequests := in.Request.EmbeddingBudget.MaxRequests
-	if maxRequests == 0 {
-		if batchMode == BatchingSplit {
-			maxRequests = 25
-		} else {
-			maxRequests = 24
-		}
+	// An omitted maxRequests uses the mode default; an explicit value is
+	// preserved as-is, including 0, which turns embedding off (budget
+	// contract: zero = off, never silently replaced by the default).
+	maxRequests := 24
+	if batchMode == BatchingSplit {
+		maxRequests = 25
+	}
+	if in.Request.EmbeddingBudget.MaxRequests != nil {
+		maxRequests = *in.Request.EmbeddingBudget.MaxRequests
 	}
 	embChars := in.Request.EmbeddingBudget.MaxChars
 	if embChars == 0 {
 		embChars = 100000
 	}
 	sweepCandidates := in.Request.EmbeddingBudget.SweepCandidates
-	if sweepCandidates == 0 && in.Request.EmbeddingBudget.MaxRequests != 0 {
+	if sweepCandidates == 0 && in.Request.EmbeddingBudget.MaxRequests != nil {
 		sweepCandidates = 90
 	}
 	topK := 100
 
 	var emb Embedder
 	var tracker *BudgetTracker
-	if e.Embedder != nil && mode != ModeLexical {
+	if embedder != nil && mode != ModeLexical {
 		tracker = NewBudgetTracker(maxRequests, embChars)
-		emb = &budgetedEmbedder{inner: e.Embedder, tracker: tracker}
+		emb = &budgetedEmbedder{inner: embedder, tracker: tracker}
 	}
 
 	cfg := SelectorConfig{
 		TopK:                topK,
-		Sweep:               SweepConfig{Enabled: e.Embedder != nil, SweepCandidates: sweepCandidates},
+		Sweep:               SweepConfig{Enabled: embedder != nil, SweepCandidates: sweepCandidates},
 		Budget:              BudgetConfig{Mode: batchMode, MaxRequests: maxRequests, BatchSize: 8, TopK: topK, SweepCandidates: sweepCandidates, MaxEmbeddingChars: embChars},
 		Weights:             DefaultWeights(),
 		AssemblyBudgetRunes: maxChars,
@@ -127,7 +149,7 @@ func (e *Engine) Run(ctx context.Context, in RunInput) (RunResult, error) {
 	}
 
 	resp := Response{SchemaVersion: WireSchemaVersion, Status: string(selection.Status), Mode: selection.Mode}
-	resp.Embedding = embeddingSummary(e.Embedder, tracker)
+	resp.Embedding = embeddingSummary(embedder, tracker)
 	resp.Rerank = RerankSummary{Enabled: false, BudgetStatus: BudgetDisabled}
 
 	// Terminal selection statuses start zero chat requests.

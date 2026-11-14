@@ -15,10 +15,12 @@ type Request struct {
 	RerankBudget    RerankBudgetWire    `json:"rerankBudget"`
 }
 
-// EmbeddingBudgetWire carries the embedding budget knobs.
+// EmbeddingBudgetWire carries the embedding budget knobs. MaxRequests is a
+// pointer so an omitted field (nil → mode default) is distinct from an
+// explicit 0, which turns embedding off per the budget contract.
 type EmbeddingBudgetWire struct {
 	BatchingMode    string `json:"batchingMode"`
-	MaxRequests     int    `json:"maxRequests"`
+	MaxRequests     *int   `json:"maxRequests"`
 	MaxChars        int    `json:"maxChars"`
 	SweepCandidates int    `json:"sweepCandidates"`
 }
@@ -101,7 +103,7 @@ func validateRequest(req Request) (maxChars int, err error) {
 	if _, verr := ValidateAssemblyBudget(float64(maxChars)); verr != nil {
 		return 0, StatusError{Status: string(SelectionInvalidBudget)}
 	}
-	if req.EmbeddingBudget.MaxRequests < 0 || req.RerankBudget.MaxRequests < 0 {
+	if (req.EmbeddingBudget.MaxRequests != nil && *req.EmbeddingBudget.MaxRequests < 0) || req.RerankBudget.MaxRequests < 0 {
 		return 0, StatusError{Status: string(SelectionInvalidBudget)}
 	}
 	if req.EmbeddingBudget.MaxChars < 0 {

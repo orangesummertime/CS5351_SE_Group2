@@ -76,3 +76,18 @@ type PassageSource interface {
 type PDFText interface {
 	Pages(ctx context.Context, contentID string) ([]Page, error)
 }
+
+// UsageSink receives the usage validity of one embedding response. The
+// per-invocation BudgetTracker implements it: a response without valid usage
+// stops the remaining requests of that invocation only.
+type UsageSink interface {
+	MarkUsageUnknown()
+}
+
+// UsageReportingEmbedder is an optional Embedder extension for adapters that
+// can report provider usage validity per call. The engine supplies its
+// per-invocation tracker as the sink; the adapter reports into it without
+// reserving a second budget slot (the engine wrapper already reserved one).
+type UsageReportingEmbedder interface {
+	EmbedWithUsage(ctx context.Context, texts []string, role EmbedRole, usage UsageSink) ([][]float32, error)
+}

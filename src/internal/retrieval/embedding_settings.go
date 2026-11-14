@@ -70,35 +70,37 @@ func ModelLimitFor(model string) (ModelLimit, bool) {
 
 // EmbeddingSettings is the user-configurable embedding/rerank configuration.
 // The API key is stored locally/env and never returned by the settings API
-// (only HasKey). Budgets are B's own retrieval budget.
+// (only HasKey). Budgets are B's own retrieval budget. The JSON tags are the
+// settings API wire shape; keys are write-only inputs (an empty key on save
+// keeps the stored one) and responses always use Mask.
 type EmbeddingSettings struct {
-	ProviderKind   string
-	Surface        string
-	BaseURL        string
-	APIKey         string
-	Model          string
-	Dimensions     int
-	BatchSize      int
-	TextType       string // optional; "" = shared, "query"/"document" role-split
-	Instruct       string // optional, query-only
-	EncodingFormat string
-	TimeoutMs      int
-	TopK           int
+	ProviderKind   string `json:"providerKind"`
+	Surface        string `json:"surface"`
+	BaseURL        string `json:"baseUrl"`
+	APIKey         string `json:"apiKey"`
+	Model          string `json:"model"`
+	Dimensions     int    `json:"dimensions"`
+	BatchSize      int    `json:"batchSize"`
+	TextType       string `json:"textType"` // optional; "" = shared, "query"/"document" role-split
+	Instruct       string `json:"instruct"` // optional, query-only
+	EncodingFormat string `json:"encodingFormat"`
+	TimeoutMs      int    `json:"timeoutMs"`
+	TopK           int    `json:"topK"`
 
-	LexicalWeight   float64
-	EmbeddingWeight float64
-	RerankWeight    float64
+	LexicalWeight   float64 `json:"lexicalWeight"`
+	EmbeddingWeight float64 `json:"embeddingWeight"`
+	RerankWeight    float64 `json:"rerankWeight"`
 
-	MaxEmbeddingRequests int
-	MaxEmbeddingChars    int
-	MaxRerankRequests    int
+	MaxEmbeddingRequests int `json:"maxEmbeddingRequests"`
+	MaxEmbeddingChars    int `json:"maxEmbeddingChars"`
+	MaxRerankRequests    int `json:"maxRerankRequests"`
 
-	RerankProvider string // off/bailian/custom
-	RerankModel    string
-	RerankBaseURL  string
-	RerankAPIKey   string
-	RerankTopN     int
-	RerankInstruct string
+	RerankProvider string `json:"rerankProvider"` // off/bailian/custom
+	RerankModel    string `json:"rerankModel"`
+	RerankBaseURL  string `json:"rerankBaseUrl"`
+	RerankAPIKey   string `json:"rerankApiKey"`
+	RerankTopN     int    `json:"rerankTopN"`
+	RerankInstruct string `json:"rerankInstruct"`
 }
 
 // DefaultEmbeddingSettings returns the local-first default (recommended

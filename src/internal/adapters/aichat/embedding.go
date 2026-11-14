@@ -48,6 +48,18 @@ func (c *EmbeddingClient) BatchingMode() retrieval.BatchingMode { return c.Setti
 // per role. A B-budget slot is reserved before the remote POST; a missing
 // usage marks the budget unknown and stops further calls.
 func (c *EmbeddingClient) Embed(ctx context.Context, texts []string, role retrieval.EmbedRole) ([][]float32, error) {
+	return c.embed(ctx, texts, role, nil)
+}
+
+// EmbedWithUsage implements retrieval.UsageReportingEmbedder: the engine's
+// per-invocation tracker receives usage validity for this call. The sink is
+// only informed; it never reserves a slot here (the engine wrapper already
+// reserved one), and it is never retained between invocations.
+func (c *EmbeddingClient) EmbedWithUsage(ctx context.Context, texts []string, role retrieval.EmbedRole, usage retrieval.UsageSink) ([][]float32, error) {
+	return c.embed(ctx, texts, role, usage)
+}
+
+func (c *EmbeddingClient) embed(ctx context.Context, texts []string, role retrieval.EmbedRole, usage retrieval.UsageSink) ([][]float32, error) {
 	if len(texts) == 0 {
 		return nil, ai.ErrInvalid
 	}
@@ -106,8 +118,13 @@ func (c *EmbeddingClient) Embed(ctx context.Context, texts []string, role retrie
 	if err != nil {
 		return nil, err
 	}
-	if !usageOK && c.Budget != nil {
-		c.Budget.MarkUsageUnknown()
+	if !usageOK {
+		if c.Budget != nil {
+			c.Budget.MarkUsageUnknown()
+		}
+		if usage != nil {
+			usage.MarkUsageUnknown()
+		}
 	}
 	return vecs, nil
 }
@@ -299,4 +316,7 @@ func usagePresent(u *struct {
 	return u != nil && u.TotalTokens != nil && *u.TotalTokens >= 0
 }
 
-var _ retrieval.Embedder = (*EmbeddingClient)(nil)
+var (
+	_ retrieval.Embedder               = (*EmbeddingClient)(nil)
+	_ retrieval.UsageReportingEmbedder = (*EmbeddingClient)(nil)
+)

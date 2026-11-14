@@ -5,13 +5,16 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"time"
 
 	"tangentry/internal/adapters/aichat"
 	"tangentry/internal/adapters/filesystem"
+	"tangentry/internal/adapters/pdftext"
 	"tangentry/internal/adapters/sqlite"
 	"tangentry/internal/adapters/tools"
 	"tangentry/internal/ai"
 	"tangentry/internal/config"
+	"tangentry/internal/content"
 	"tangentry/internal/discovery"
 	"tangentry/internal/playback"
 	"tangentry/internal/retrieval"
@@ -88,11 +91,52 @@ func newRetrievalEngine(store *sqlite.Store) *retrieval.Engine {
 	if err != nil {
 		settings = retrieval.DefaultEmbeddingSettings()
 	}
-	var embedder retrieval.Embedder
-	if retrieval.ValidateEmbeddingSettings(settings) == nil {
-		embedder = aichat.NewEmbeddingClient(settings, nil, retrieval.NewProcessVectorCache())
+	return &retrieval.Engine{Source: source, Embedder: newEmbeddingAdapter(settings), Assembler: retrieval.NewContextAssembler()}
+}
+
+// newEmbeddingAdapter builds the embedding adapter for validated settings.
+// The per-invocation budget lives in the engine wrapper, so the adapter is
+// constructed with a nil budget; usage validity flows back through the
+// engine's tracker (retrieval.UsageReportingEmbedder). Invalid settings yield
+// a nil adapter (lexical-only), never a half-configured client.
+func newEmbeddingAdapter(settings retrieval.EmbeddingSettings) retrieval.Embedder {
+	if retrieval.ValidateEmbeddingSettings(settings) != nil {
+		return nil
 	}
-	return &retrieval.Engine{Source: source, Embedder: embedder, Assembler: retrieval.NewContextAssembler()}
+	return aichat.NewEmbeddingClient(settings, nil, retrieval.NewProcessVectorCache())
+}
+
+// newPDFExtraction wires the extraction service for the saved-PDF flow: the
+// vetted native text-layer extractor with the SQLite page-text store. OCR is
+// local-first (user-installed runtime, no upload); cloud OCR stays disabled
+// here — it requires explicit enablement plus recorded consent, and is never
+// a silent fallback.
+func newPDFExtraction(store *sqlite.Store) *retrieval.PDFExtractionService {
+	return retrieval.NewPDFExtractionService(pdftext.NativeExtractor{}, store, store, retrieval.PDFExtractionConfig{OCRMode: retrieval.OCRModeLocal})
+}
+
+// extractSavedPDF populates the server-side page text for a saved PDF so
+// retrieval can read it. Failures are logged, never fatal to the save: the
+// retrieval pipeline reports the explicit PDF status on the next request.
+func extractSavedPDF(ctx context.Context, extraction *retrieval.PDFExtractionService, documents *filesystem.Documents, item content.Item) {
+	if item.Kind != "pdf" {
+		return
+	}
+	file, err := documents.File(item.PlatformID)
+	if err != nil {
+		slog.Warn("Saved PDF file unavailable for text extraction", "contentId", item.ID)
+		return
+	}
+	path := file.Name()
+	_ = file.Close()
+	result, err := extraction.Extract(ctx, item.ID, path, time.Now().Unix())
+	if err != nil {
+		slog.Warn("PDF text extraction failed", "contentId", item.ID)
+		return
+	}
+	if result.Status != retrieval.PDFStatusReady {
+		slog.Info("PDF text extraction incomplete", "contentId", item.ID, "status", result.Status)
+	}
 }
 
 // newCompatibility converts online videos the web view cannot play; it is optional.
