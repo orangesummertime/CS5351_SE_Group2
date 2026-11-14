@@ -743,3 +743,71 @@ entries:
       to cloud silently. Migration 082 is additive/idempotent; no published
       migration was edited. Implementation acceptance and APPROVE remain
       human non-author actions.
+  - id: B-AI-012
+    date: "2026-11-14"
+    owner: "WANG Jiaqi (B)"
+    tool: "OpenCode"
+    model: "qwen4-max-preview"
+    purpose: >-
+      Implementation Phase 4 (embedding/rerank adapters + B-only budget) for
+      FR-02, NFR-02, INV-04, INV-05 on owner/b-implementation, after the human
+      confirmed Phase 3. Test-first: wrote B-T24 (B budget + A ledger
+      untouched), B-T26 (dimension/model/usage/auth failures), B-T30 (process
+      + persistent vector cache), B-T31 (settings + role/surface), B-T32
+      (weights), B-T33 (full cold-cache mode matrix with exact request
+      counts), B-T35 (masked settings + persistence/reload), B-T36 (rerank),
+      B-T37 embedding part (local-first), recorded red runs, then implemented
+      the B budget tracker, vector caches, embedding settings validation, the
+      local/custom/Bailian embedding adapter (both surfaces, role-correct
+      text_type, float/base64, dimension/model validation, usage handling),
+      the optional rerank adapter, and migrations 083/085. Also refactored the
+      selector to mode-aware batching (shared ceil((1+C)/B), split reserved
+      query) and aligned the provisional Phase-1 call-count assertions.
+    scope:
+      read:
+        - "docs/evidence/b-embedding-provider-notes.md (surfaces, model limits, local preset), docs/plans/b-retrieval-preimplementation.md (settings UI contract, budget formulas), docs/architecture/adr/002-question-relevant-retrieval.md (scoring, vector cache, B budget)"
+        - "src/internal/adapters/aichat/protocol.go (transport patterns: Bearer auth, redirect policy, redacted errors), src/internal/ai/settings.go (ValidEndpoint), src/internal/adapters/aichat/budget.go (A boundary, read-only)"
+      wrote:
+        - "src/internal/retrieval/embedding_budget.go, vector_cache.go, embedding_settings.go (+ embedding_domain_test.go); types.go (RerankResult); selector.go (mode-aware embedUnion)"
+        - "src/internal/adapters/aichat/embedding.go, rerank.go (+ embedding_test.go, rerank_test.go, budget_matrix_test.go)"
+        - "src/internal/adapters/sqlite/migrations/083_passage_embeddings.sql, 085_retrieval_settings.sql; vector_cache.go, retrieval_settings.go (+ retrieval_phase4_test.go)"
+        - "src/internal/retrieval/fixtures_test.go, selector_test.go (fake question-by-text; B-T39 shared formula; embedder-failure both modes)"
+        - "docs/evidence/b-impl-phase4-focused.log, b-impl-phase4-go-full.log, b-impl-phase4-layering.log, b-impl-phase4-web.log, b-impl-phase4-determinism.log, b-impl-phase4-report.md"
+        - "docs/ai-use-log.yaml (this entry)"
+        - "contributions/013-owner-b-implementation.md (Phase 4 section)"
+        - "owner-local, not committed: docs/transcripts/owner-b/2026-11-14-phase4-embedding.json, README.md (new index row)"
+      executed:
+        - "go test focused (retrieval/ai/transport/aichat/sqlite) -count=1 (exit 0)"
+        - "go test ./... -count=1 (45 ok / 11 no-test, exit 0)"
+        - "go test ./internal/layering -count=1 (exit 0); go vet (exit 0); gofmt clean"
+        - "npm --prefix src/web test -- --run (62 files / 251 tests, exit 0); npm --prefix src/web run build (exit 0)"
+        - "two-run determinism diff identical (exit 0, 26 PASS/run); B-T33 exact request counts (shared R24=24, split R25=25, split R24=24)"
+        - "git diff main A-budget + protocol.go empty; grep confirms B adapters never call reserveCompletion; published migrations unchanged (082/083/084/085 added)"
+        - "git commit (phase 4); no push in this session"
+        - "Read-only export of this session via src/build/sexport at phase end (after the commit); sha256 recorded in the local README"
+    network_writes: []
+    original_session_id: ses_e27efbad7ffeY2pIG6EzRIOgOQ
+    transcript: >-
+      owner-local docs/transcripts/owner-b/2026-11-14-phase4-embedding.json
+      (raw OpenCode session export retained outside git; one continuous
+      session with B-AI-008..011, captured at phase end after the commit; can
+      be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    human_review: "pending"
+    generated_code: true
+    notes: >-
+      No real embedding/rerank provider, credential or network endpoint was
+      used; all adapter tests use httptest fake transports that count every
+      request and its role/text_type. The only key-like strings are synthetic
+      test fixtures (test-key, super-secret-key, etc.) proving masking and
+      redaction; no real secret is present. B uses its OWN BudgetTracker and
+      never calls A's reserveCompletion; A's budget.go/ledger.go/protocol.go
+      are byte-identical to main (empty git diff). The selector batching
+      refactor aligns shared mode to ceil((1+C)/B) and split to 1+ceil(C/B);
+      the Phase-1 B-T39 call-count assertion was updated from the provisional
+      split formula to the shared formula (documented, not weakened). Vector
+      cache: process-local default plus opt-in persistent SQLite (migration
+      083) per the human "both" decision; selector-level cache wiring lands in
+      Phase 5. Migrations 083/085 are additive/idempotent; no published
+      migration edited. Implementation acceptance and APPROVE remain human
+      non-author actions.

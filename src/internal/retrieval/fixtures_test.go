@@ -288,13 +288,14 @@ type embedCall struct {
 }
 
 type fakeEmbedder struct {
-	dim         int
-	mode        BatchingMode
-	model       string
-	calls       []embedCall
-	goldMarkers []string
-	failQuery   bool
-	failDocs    bool
+	dim          int
+	mode         BatchingMode
+	model        string
+	calls        []embedCall
+	goldMarkers  []string
+	questionText string
+	failQuery    bool
+	failDocs     bool
 }
 
 func newFakeEmbedder(mode BatchingMode) *fakeEmbedder {
@@ -307,6 +308,11 @@ func (f *fakeEmbedder) BatchingMode() BatchingMode { return f.mode }
 
 func (f *fakeEmbedder) Embed(ctx context.Context, texts []string, role EmbedRole) ([][]float32, error) {
 	f.calls = append(f.calls, embedCall{Role: role, Texts: append([]string(nil), texts...)})
+	// The selector always embeds the question first (sole query in split
+	// mode; texts[0] of the first combined batch in shared mode).
+	if f.questionText == "" && len(texts) > 0 {
+		f.questionText = texts[0]
+	}
 	if role == EmbedQuery && f.failQuery {
 		return nil, fmt.Errorf("fake embedder unavailable")
 	}
@@ -322,7 +328,9 @@ func (f *fakeEmbedder) Embed(ctx context.Context, texts []string, role EmbedRole
 
 func (f *fakeEmbedder) vectorFor(text string, role EmbedRole) []float32 {
 	v := make([]float32, f.dim)
-	if role == EmbedQuery {
+	// The question vector is assigned by role (split) or by text identity
+	// (shared, where the question rides in a combined document batch).
+	if role == EmbedQuery || (f.questionText != "" && text == f.questionText) {
 		v[0] = 1
 		return v
 	}
@@ -336,6 +344,18 @@ func (f *fakeEmbedder) vectorFor(text string, role EmbedRole) []float32 {
 	_, _ = h.Write([]byte(text))
 	v[1+int(h.Sum32()%uint32(f.dim-1))] = 1
 	return v
+}
+
+// embeddedQuestion reports whether the question text was sent to the embedder.
+func (f *fakeEmbedder) embeddedQuestion() bool {
+	for _, c := range f.calls {
+		for _, t := range c.Texts {
+			if t == f.questionText {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (f *fakeEmbedder) requestCount() int { return len(f.calls) }

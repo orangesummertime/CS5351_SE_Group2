@@ -151,6 +151,13 @@ type HistoryTurn struct {
 	Content string
 }
 
+// RerankResult is one request-relative rerank score (0–1). Scores from
+// different requests must never be compared.
+type RerankResult struct {
+	Index          int
+	RelevanceScore float64
+}
+
 // AssemblyInput feeds the six-layer context assembler.
 type AssemblyInput struct {
 	Selection       Selection

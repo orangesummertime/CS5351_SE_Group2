@@ -218,43 +218,26 @@ func (s *selector) Select(ctx context.Context, contentID, question string, maxCa
 	// 7. Embedding (B budget; zero capacity → lexical_only, no query call).
 	var passages []Passage
 	if embeddingPossible {
-		qvecs, err := s.emb.Embed(ctx, []string{question}, EmbedQuery)
-		if err == nil && len(qvecs) == 1 {
+		qvec, ok := s.embedUnion(ctx, question, union, cfg.Budget.BatchSize)
+		if ok {
 			sel.EmbeddingModel = s.emb.ModelID()
-			batch := cfg.Budget.BatchSize
-			embedded := true
-			for start := 0; start < len(union); start += batch {
-				end := minInt(start+batch, len(union))
-				texts := make([]string, 0, end-start)
-				for _, c := range union[start:end] {
-					texts = append(texts, c.text())
-				}
-				vecs, err := s.emb.Embed(ctx, texts, EmbedDocument)
-				if err != nil || len(vecs) != len(texts) {
-					embedded = false
-					break
-				}
-				for i, c := range union[start:end] {
-					c.vector = vecs[i]
-					c.cosine = Cosine(qvecs[0], vecs[i])
+			for _, c := range union {
+				c.cosine = Cosine(qvec, c.vector)
+			}
+			maxLex := 0.0
+			for _, c := range union {
+				if c.lexical.Score > maxLex {
+					maxLex = c.lexical.Score
 				}
 			}
-			if embedded {
-				maxLex := 0.0
-				for _, c := range union {
-					if c.lexical.Score > maxLex {
-						maxLex = c.lexical.Score
-					}
+			for _, c := range union {
+				lexNorm := 0.0
+				if maxLex > 0 {
+					lexNorm = c.lexical.Score / maxLex
 				}
-				for _, c := range union {
-					lexNorm := 0.0
-					if maxLex > 0 {
-						lexNorm = c.lexical.Score / maxLex
-					}
-					passages = append(passages, c.passage(contentID, weights, lexNorm))
-				}
-				sel.Mode = ModeHybrid
+				passages = append(passages, c.passage(contentID, weights, lexNorm))
 			}
+			sel.Mode = ModeHybrid
 		}
 	}
 	if passages == nil {
@@ -324,6 +307,61 @@ func allStale(dropped []DroppedPassage) bool {
 		}
 	}
 	return true
+}
+
+// embedUnion embeds the question and candidate texts with mode-aware
+// batching and sets each candidate's vector. Split mode reserves one query
+// request (text_type=query) and never mixes roles; shared mode batches the
+// question with the documents (identical request-level config, no text_type)
+// so the cold-cache request count is ceil((1+C)/B). Returns the question
+// vector and ok=false on any embedder failure (caller falls back to lexical).
+func (s *selector) embedUnion(ctx context.Context, question string, union []*candidate, batch int) ([]float32, bool) {
+	if batch <= 0 {
+		batch = 8
+	}
+	if s.emb.BatchingMode() == BatchingSplit {
+		qvecs, err := s.emb.Embed(ctx, []string{question}, EmbedQuery)
+		if err != nil || len(qvecs) != 1 {
+			return nil, false
+		}
+		for start := 0; start < len(union); start += batch {
+			end := minInt(start+batch, len(union))
+			texts := make([]string, 0, end-start)
+			for _, c := range union[start:end] {
+				texts = append(texts, c.text())
+			}
+			vecs, err := s.emb.Embed(ctx, texts, EmbedDocument)
+			if err != nil || len(vecs) != len(texts) {
+				return nil, false
+			}
+			for i, c := range union[start:end] {
+				c.vector = vecs[i]
+			}
+		}
+		return qvecs[0], true
+	}
+	// Shared: question is texts[0]; question + documents share each batch.
+	all := make([]string, 0, len(union)+1)
+	all = append(all, question)
+	for _, c := range union {
+		all = append(all, c.text())
+	}
+	var qvec []float32
+	for start := 0; start < len(all); start += batch {
+		end := minInt(start+batch, len(all))
+		vecs, err := s.emb.Embed(ctx, all[start:end], EmbedDocument)
+		if err != nil || len(vecs) != end-start {
+			return nil, false
+		}
+		for i := start; i < end; i++ {
+			if i == 0 {
+				qvec = vecs[0]
+				continue
+			}
+			union[i-1].vector = vecs[i-start]
+		}
+	}
+	return qvec, true
 }
 
 // sweep adds the deterministic position-stratified sample to the union.

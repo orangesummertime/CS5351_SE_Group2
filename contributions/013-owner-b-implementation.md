@@ -203,3 +203,57 @@ load/split → lexical → sweep → embed → dedupe/verify.
   exercised through the OCR path with fakes.
 - Embedding/rerank adapters + B budget are Phase 4; transport/AI integration
   Phase 5; frontend Phase 6; evaluation Phase 7 (waits for WANG Jiaqi's set).
+
+## Phase 4 — embedding/rerank adapters + B budget (2026-11-14)
+
+### What changed
+
+- **B-only budget** (`retrieval/embedding_budget.go`): `BudgetTracker` reserves
+  a slot before every remote POST; request limit / usage-unknown stop further
+  calls; statuses completed/embedding_budget_limited/embedding_budget_exhausted/
+  embedding_usage_unknown. Independent of A's completion ledger.
+- **Vector cache** (`retrieval/vector_cache.go` + `sqlite/vector_cache.go`):
+  process-local default and opt-in persistent SQLite (migration 083), keyed by
+  (contentId, sourceVersion, passageId, modelId, dimensions); identity change ⇒
+  miss; dimension mismatch rejected.
+- **Embedding settings** (`retrieval/embedding_settings.go`): local-first
+  default (bge-m3/1024, loopback), per-model Bailian dimension/row limits,
+  weight/budget validation, local-loopback enforcement, masked API shape
+  (hasKey/hasRerankKey only).
+- **Embedding adapter** (`aichat/embedding.go`): implements `retrieval.Embedder`
+  over OpenAI-compatible and DashScope surfaces; role-correct text_type (split
+  never mixes roles), query-only instruct, float/base64, dimension + model
+  identity validation (fail closed), usage-unknown handling, redacted errors,
+  fixed-string connection test. Uses B's budget, never A's reserveCompletion.
+- **Rerank adapter** (`aichat/rerank.go`): off by default; DashScope/compatible
+  surfaces; request-relative scores clamped [0,1]; B-budgeted; failure → error
+  for rerank_unavailable degradation.
+- **Selector mode-aware batching** (`retrieval/selector.go`): shared combines
+  question+docs → ceil((1+C)/B) requests; split reserves a query request →
+  1+ceil(C/B). Phase-1 provisional call-count assertions aligned.
+- **Settings persistence** (`sqlite/retrieval_settings.go`, migration 085):
+  save/reload preserves all fields; unsaved load returns the labelled default;
+  invalid settings rejected; key never returned.
+
+### Verification (test-first; raw logs retained)
+
+- B-T33 full mode matrix through real selector+adapter+httptest: exact request
+  counts (shared R24=24, split R25=25, split R24=24), zero-capacity rows make 0
+  requests, split never mixes roles, -1 → invalid_budget, sweepCandidates=0 →
+  sweep_disabled_by_config, char-bound shrinks both shares.
+- B-T24/B-T26/B-T30/B-T31/B-T32/B-T35/B-T36/B-T37(embedding) all green; 26-test
+  determinism set identical across two runs.
+- Gates: focused exit 0 (`b-impl-phase4-focused.log`); full 45 ok / 11 no-test
+  exit 0 (`b-impl-phase4-go-full.log`); layering + vet + gofmt + A-budget empty
+  diff + B adapters never call reserveCompletion (`b-impl-phase4-layering.log`);
+  frontend 62 files / 251 tests + build exit 0 (`b-impl-phase4-web.log`);
+  determinism (`b-impl-phase4-determinism.log`).
+- Phase report: `docs/evidence/b-impl-phase4-report.md`.
+
+### Limits
+
+- All provider tests use httptest fakes; no real embedding/rerank call or
+  credential. Live provider measurement is a separate authorized run.
+- Selector-level vector-cache wiring (per-passage keys) lands in Phase 5; the
+  cache port + both implementations + unit tests are complete here.
+- Cloud embedding requires an explicit provider switch (local-first default).

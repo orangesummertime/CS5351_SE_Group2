@@ -182,13 +182,14 @@ func TestBT39_ZeroOverlapDegenerateLexical(t *testing.T) {
 	if got.Status != SelectionSweepLimited {
 		t.Fatalf("status = %q, want semantic_sweep_limited", got.Status)
 	}
-	// Embedding call count: 1 query + ceil(90/8) document batches.
-	wantCalls := 1 + (90+7)/8
+	// Shared-mode cold-cache request count: ceil((1+C)/B) with C=90, B=8.
+	// The question shares the document batches (no separate query request).
+	wantCalls := (1 + 90 + 7) / 8
 	if emb.requestCount() != wantCalls {
 		t.Fatalf("embed calls = %d, want %d", emb.requestCount(), wantCalls)
 	}
-	if emb.countRole(EmbedQuery) != 1 {
-		t.Fatal("query must be embedded exactly once")
+	if !emb.embeddedQuestion() {
+		t.Fatal("question must be embedded")
 	}
 	// Lexical-only misses the gold entirely.
 	selLex := NewSelector(&fakeSource{snap: snap}, nil, defaultSelectorConfig())
@@ -473,7 +474,7 @@ func TestSelectorEmbedderFailure(t *testing.T) {
 	snap, _, _ := buildZeroOverlapArticle(t, true, 24)
 	src := &fakeSource{snap: snap}
 	emb := newFakeEmbedder(BatchingShared)
-	emb.failQuery = true
+	emb.failQuery, emb.failDocs = true, true // fail regardless of batching mode
 	sel := NewSelector(src, emb, defaultSelectorConfig())
 	got, err := sel.Select(context.Background(), snap.ContentID, questionZeroOverlap, 0)
 	if err != nil {
@@ -484,6 +485,14 @@ func TestSelectorEmbedderFailure(t *testing.T) {
 	}
 	if len(got.Passages) == 0 {
 		t.Fatal("lexical fallback must still return the distractor passages")
+	}
+	// Split mode: a failed reserved query request also degrades to lexical.
+	embSplit := newFakeEmbedder(BatchingSplit)
+	embSplit.failQuery = true
+	selSplit := NewSelector(&fakeSource{snap: snap}, embSplit, defaultSelectorConfig())
+	gotSplit, err := selSplit.Select(context.Background(), snap.ContentID, questionZeroOverlap, 0)
+	if err != nil || gotSplit.Status != SelectionLexicalOnly {
+		t.Fatalf("split failure: %+v %v", gotSplit, err)
 	}
 }
 
