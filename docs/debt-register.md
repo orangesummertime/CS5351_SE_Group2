@@ -29,3 +29,14 @@ owner; do not replace or renumber another owner's row.
 Reopening any item requires an updated requirement, ADR, negative tests and
 independent review. This register is a planning artifact, not evidence of
 implementation.
+
+## E · chat evidence freshness and CI governance
+
+| ID | Deferred item | Why deferred for E v1 | Reopen condition | Owner |
+| --- | --- | --- | --- | --- |
+| E-D01 | Freshness for notes saved from chat answers | Notes do not currently store a content snapshot, and changing the note schema is a separate migration and UI change. FR-05 as registered covers stored chat answers and citations. | The group requires note expiry, or notes start carrying citation/version snapshots. | E + notes owner |
+| E-D02 | GitHub-enforced required checks and Issue #3 completion | In-repo workflows cannot change admin branch-protection settings. Public observation on 2026-11-20 showed required status checks off. | The repository admin enables the settings in `docs/plans/e-ci-gates.md` and a passing required run exists. | Repo admin (`orangesummertime`) + E |
+| E-D03 | Backfilling snapshots for pre-E chat history | Legacy messages have no captured revision/hash; v1 already fails closed and will not display them as currently valid. Reconstructing a historical snapshot is best-effort and could be wrong. | Product or review requires a reconstructed history, or a dedicated evidence table. | E |
+| E-D04 | Official OpenCode + DeepSeek V4 Flash annotated transcripts | This branch was prepared with Grok in Grok Bot. Course deliverable D5 still requires the specified tool and raw annotated transcripts. | The student records official sessions and commits or retains the raw exports. | 刘若轩 (E) |
+| E-D05 | Freshness for D comparison results | Comparison records are owned by D and may not yet carry the same snapshots. Reusing `freshness.Assess` is straightforward once those records exist. | D persists long-lived comparison evidence that users might treat as current. | D + E |
+

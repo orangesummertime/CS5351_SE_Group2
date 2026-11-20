@@ -1,0 +1,22 @@
+# Pending test-approval record for Owner E (FR-05 / NFR-05 / INV-06 / INV-07).
+# This file is a request, not an approval. The CI gate must keep failing
+# until a non-author reviewer changes decision to APPROVED and signs it.
+requirement_ids:
+  - FR-05
+  - NFR-05
+  - INV-06
+  - INV-07
+plan: docs/plans/e-freshness-preimplementation.md
+adr: docs/architecture/adr/003-citation-version-freshness.md
+owner: 刘若轩
+owner_github: h5f8fzckp7-coder
+# suggested reviewer per the group cross-review rule (D reviews E)
+suggested_reviewer: Wenlong Lu (D)
+decision: PENDING
+approved_commit: ""
+reviewer: ""
+reviewer_github: ""
+approved_at: ""
+notes: >-
+  Plan, tests and implementation were prepared on branch owner-e-liu-ruoxuan
+  for review. Do not treat this file as the course test-approval gate.

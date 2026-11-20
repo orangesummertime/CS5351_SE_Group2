@@ -16,7 +16,7 @@
 
 ## 小组分工与任务清单
 
-以下按五个职责分配，成员姓名由小组认领；B 已由 WANG Jiaqi 认领，D 已由 Wenlong Lu 认领，C 已由 CHEN Yuyan 认领，其余待认领。每人负责自己的需求、设计、实现、测试、原始 AI 会话和报告部分。候选功能是否足以满足课程“每人新增需求”的数量与复杂度，须在需求评审时确认。勾选只依据仓库中的实际证据，不能把计划当作完成。任务之间不设时间表。
+以下按五个职责分配，成员姓名由小组认领；B 已由 WANG Jiaqi 认领，D 已由 Wenlong Lu 认领，C 已由 CHEN Yuyan 认领，E 已由刘若轩认领。每人负责自己的需求、设计、实现、测试、原始 AI 会话和报告部分。候选功能是否足以满足课程“每人新增需求”的数量与复杂度，须在需求评审时确认。勾选只依据仓库中的实际证据，不能把计划当作完成。任务之间不设时间表。
 
 | 职责 | 成员 | 负责范围 | 主要接口／目录 |
 | --- | --- | --- | --- |
@@ -24,11 +24,11 @@
 | B：问题相关检索 | WANG Jiaqi | 为长内容问答选择相关原文片段，记录检索依据 | `src/internal/ai/`、`src/internal/retrieval/`、`src/web/src/features/ai/chatContext.ts` |
 | C：问答引用核验 | CHEN Yuyan(Github@:892290356)| 结构化引用、服务端核验、前端来源展示与跳转 | `src/internal/ai/chat.go`、`src/internal/transport/http/`、`src/web/src/features/ai/` |
 | D：多内容比较 | Wenlong Lu | 用户选定内容的比较问答、逐来源证据和冲突／不足提示 | `src/internal/content/`、`src/internal/ai/`、`src/web/src/features/ai/` |
-| E：版本状态与验证治理 | 待认领 | 内容变更后的引用失效／过期状态、CI 门槛和交付核对 | `src/internal/ai/`、`src/internal/adapters/sqlite/`、`.github/workflows/` |
+| E：版本状态与验证治理 | 刘若轩（GitHub: [@h5f8fzckp7-coder](https://github.com/h5f8fzckp7-coder)，学号 60862168） | 内容变更后的引用失效／过期状态、CI 门槛和交付核对 | `src/internal/ai/`、`src/internal/freshness/`、`src/internal/adapters/sqlite/`、`.github/workflows/` |
 
 ### 五组候选需求与验收
 
-下表每组包含**一项功能需求（FR）和一项非功能需求（NFR）**，用于把岗位变成可演示、可测量的增量。ID、样本数和阈值目前都是**待批准提案**，尚未进入正式 `requirements.yaml`，更不是完成声明。先用同一固定输入记录原版行为，再由小组审查阈值、测试设计和各组是否满足课程计数要求；不要把同一问答链路的不同步骤直接算成五个独立成果。
+下表每组包含**一项功能需求（FR）和一项非功能需求（NFR）**，用于把岗位变成可演示、可测量的增量。A、B 的需求已批准写入 `requirements.yaml`；D、E 已登记但 approval 仍为 pending；C 尚未正式登记。表中内容在完成独立审查前都不是完成声明。先用同一固定输入记录原版行为，再由小组审查阈值、测试设计和各组是否满足课程计数要求；不要把同一问答链路的不同步骤直接算成五个独立成果。
 
 | 负责人 | 功能需求：可观察行为 | 非功能需求：候选指标与阈值 | 原版对照与验证 |
 | --- | --- | --- | --- |
@@ -89,11 +89,11 @@ FR-02 交付的是**选片段**，FR-03 交付的是**回答引用核验**，FR-
 
 ### E：内容版本状态与验证治理
 
-- [ ] 定义原文更新、删除或重新抓取时，旧回答、引用及相关笔记的过期状态与存储规则；如需迁移，只追加新迁移文件。
-- [ ] 实现并测试版本改变、内容消失、重新打开和并发更新后的状态判定；旧证据不得继续显示为当前有效。
-- [ ] 建立课程要求的六项 CI 阻断检查：事前人工批准、静态／依赖检查、需求 schema、prompt／模型变更后的语义评估、全量回归、AI 使用日志同步。
-- [ ] 核实分支保护真正要求 CI 与独立人工审查；安全关键路径关联 ADR，不能以作者自填标记代替批准。
-- [ ] 维护审查 memo、技术债和重大 bug 日记，汇总可复现的验证证据。
+- [x] 定义原文更新或删除后，旧聊天回答与引用的过期／不可用状态与存储规则；消费 B 已有的 `content_revision` / `content_hash`，不追加重复列，也不修改已发布迁移。相关笔记的过期状态留待后续（见[技术债](docs/debt-register.md)）。规则见 [ADR-003](docs/architecture/adr/003-citation-version-freshness.md) 和 [E 需求](docs/req/requirements.yaml)。
+- [x] 实现并测试版本改变、内容消失、重新打开和并发更新后的状态判定；旧证据不得继续显示为当前有效。离线证据见 [E 验证记录](docs/evidence/e-verification.md)。实现待独立审查，不视为已验收。
+- [x] 在仓库中建立课程要求的六项 CI 作业：事前人工批准、静态／依赖检查、需求 schema、prompt／模型变更后的语义评估、全量回归、AI 使用日志同步。见 [CI 说明](docs/plans/e-ci-gates.md) 与 `.github/workflows/ci.yml`。这些作业**尚未**被 GitHub 分支保护设为必需检查，因此现在不能声称已经阻断向 `main` 的合并。
+- [ ] 核实分支保护真正要求 CI 与独立人工审查；安全关键路径关联 ADR，不能以作者自填标记代替批准。目前仅能观察到 `main` 受保护，但 required status checks 为关闭且列表为空；需要仓库管理员按 [CI 说明](docs/plans/e-ci-gates.md) 打开设置。不勾选 [Issue #3](https://github.com/orangesummertime/CS5351_SE_Group2/issues/3)。
+- [x] 维护审查 memo、技术债和重大 bug 日记，汇总可复现的验证证据。审查 memo 的结论是**需要独立组员审查**（建议 D 审 E），作者未自批。
 
 ### 全员交付核对
 

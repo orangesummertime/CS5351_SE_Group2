@@ -293,3 +293,12 @@
 .ai-retrieval-settings legend { font-size: 12px; color: var(--muted); padding-inline: 4px; }
 .ai-retrieval-settings-error { color: #dc2626; font-size: 12px; margin: 0; }
 .ai-retrieval-settings [role="status"] { color: var(--muted); font-size: 12px; }
+
+.ai-chat-version { margin: 6px 0 0; font-size: 11px; color: var(--muted); }
+.ai-chat-version-current { color: var(--muted); }
+.ai-chat-version-expired, .ai-chat-citation-expired .ai-chat-citation-status { color: var(--accent); }
+.ai-chat-version-unavailable, .ai-chat-citation-unavailable .ai-chat-citation-status { color: var(--accent); }
+.ai-chat-citations { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; }
+.ai-chat-citation { display: grid; gap: 2px; padding: 6px 8px; border: 1px solid var(--control-line); font-size: 11px; }
+.ai-chat-citation-quote { overflow-wrap: anywhere; color: var(--ink); }
+.ai-chat-citation-status { color: var(--muted); }

@@ -76,3 +76,17 @@ Add thin test packages that call the colocated domain suites; do not move
 upstream `_test.go` files just to satisfy a directory shape. The package path
 `tangentry/test/offline` is inside the `tangentry` tree, so it may import
 `tangentry/internal/...` under Go's internal rule. Keep the same fixture policy.
+
+## Owner E freshness (FR-05 / NFR-05)
+
+Deterministic suites live with the packages they test:
+
+```bash
+cd src
+go test ./internal/freshness ./internal/ai ./internal/adapters/sqlite ./internal/transport/http -count=1 -run "NFR05|Freshness|ET"
+cd web
+npx vitest run src/features/ai/chatFreshness.test.ts
+```
+
+The frozen NFR-05 cases are in `src/internal/freshness/freshness_test.go`. They do not use a network or a live model. See `docs/plans/e-freshness-preimplementation.md`.
+

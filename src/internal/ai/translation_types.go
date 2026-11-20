@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"tangentry/internal/citation"
+	"tangentry/internal/freshness"
 	"tangentry/internal/retrieval"
 	"tangentry/internal/subtitles"
 )
@@ -31,6 +32,13 @@ type ChatMessage struct {
 	Content   string              `json:"content"`
 	Model     string              `json:"model,omitempty"`
 	Citations []citation.Citation `json:"citations,omitempty"`
+	// SourceRevision and SourceHash are the server-owned content snapshot
+	// captured when this assistant message was stored (E / FR-05).
+	SourceRevision int64  `json:"sourceRevision,omitempty"`
+	SourceHash     string `json:"sourceHash,omitempty"`
+	// VersionStatus is computed freshness (current/expired/unavailable). It
+	// is distinct from citation.Status, which is C's generation-time check.
+	VersionStatus freshness.Status `json:"versionStatus,omitempty"`
 }
 
 type ChatRequest struct {
@@ -114,6 +122,7 @@ type Service struct {
 	wait            sync.WaitGroup
 	saveSummaryNote func(context.Context, SummaryResult) error
 	retrievalEngine *retrieval.Engine
+	contentVersions ContentVersionReader
 }
 
 // SetSummaryNoteWriter connects the optional notes use case at the composition root.

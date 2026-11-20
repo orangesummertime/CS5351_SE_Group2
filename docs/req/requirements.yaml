@@ -8,10 +8,10 @@ note: >-
   and INV-05 (question-relevant retrieval). D owns FR-04 and NFR-04
   (multi-content comparison).
 
-  Test IDs use owner prefixes (A-Txx, B-Txx, D-Txx). Append entries per
-  owner and retain existing requirement and test IDs; never renumber or
-  replace existing entries. C and E remain candidate areas in README,
-  with their scope, ownership and task assignments still open.
+  Test IDs use owner prefixes (A-Txx, B-Txx, D-Txx, E-Txx). Append
+  entries per owner and retain existing requirement and test IDs; never
+  renumber or replace existing entries. C remains a candidate area in
+  README until its owner registers formal requirements.
 
   A requirements: The group confirmed implementation under A's existing
   plan on 2026-11-13. This does not approve final implementation
@@ -27,6 +27,11 @@ note: >-
   D requirements (FR-04, NFR-04): Approved for implementation via PR #8
   (owner/d) by a non-author group member. Final implementation acceptance
   still requires a separate non-author human review of the implementation PR.
+
+  E requirements (FR-05, NFR-05, INV-06, INV-07): Registered by 刘若轩
+  (Owner E) on 2026-11-20. Approval is pending an independent non-author
+  review (suggested reviewer: Owner D). Registration is not implementation
+  acceptance and does not mark Issue #3 or GitHub branch protection as done.
 requirements:
   - id: FR-01
     type: functional
@@ -741,3 +746,136 @@ requirements:
       source failures. Case-level attribution makes one wrong source fail the
       case. Per-source diagnostics expose partial correctness and the repeated
       run records real-provider variation.
+
+  - id: FR-05
+    type: functional
+    owner: "刘若轩 (E)"
+    approval: pending
+    priority: Must
+    source:
+      - "../../README.md"
+      - "../architecture/adr/003-citation-version-freshness.md"
+      - "../plans/e-freshness-preimplementation.md"
+      - "../../src/internal/freshness/freshness.go"
+    related: ["FR-03", "INV-05"]
+    statement: >-
+      After a saved source is updated or deleted, previously stored chat
+      answers and their citations show an expired or unavailable version
+      status. The same status is returned when the conversation is reopened.
+      Freshness is computed from a server-owned content snapshot and is
+      distinct from upstream summary-citation cache reuse and from C's
+      generation-time verification status.
+    fit:
+      - id: AC-FR-05-1
+        scenario: "A chat answer is stored against a saved source, then the source is saved again with a new revision or content hash."
+        expected: "Reopening the conversation marks the old answer and its citations expired. They are not displayed as currently valid."
+        test: E-T02
+      - id: AC-FR-05-2
+        scenario: "The saved source is deleted after a chat answer was stored."
+        expected: "Reopening the conversation marks the old answer and citations unavailable. They are not displayed as currently valid."
+        test: E-T03
+      - id: AC-FR-05-3
+        scenario: "The user reopens the same conversation twice after an update or delete, or reopens it while the source is unchanged."
+        expected: "Status follows the live saved content; repeated reopen is stable for an unchanged source; a current answer remains current only while the snapshot still matches."
+        test: E-T04
+      - id: AC-FR-05-4
+        scenario: "A client sends forged current freshness, source revision, source hash or citations with a new chat request."
+        expected: "The service discards the client-supplied evidence labels. Only server-captured snapshots and server-assessed freshness are stored or returned."
+        test: E-T05
+      - id: AC-FR-05-5
+        scenario: "The source is updated and the user then asks a new question in the same conversation."
+        expected: "The earlier assistant message stays expired; the new assistant message is stamped with the live snapshot and can be current."
+        test: E-T06
+    tradeoff: >-
+      v1 expires evidence when either content_revision or content_hash no
+      longer matches, including a Save that only bumps the revision. This
+      is conservative for NFR-05 and follows the server-owned version
+      columns introduced by B. Historical answers are kept, not deleted.
+      Related notes and D comparison results are out of v1 scope.
+  - id: NFR-05
+    type: nonfunctional
+    owner: "刘若轩 (E)"
+    approval: pending
+    priority: Must
+    source:
+      - "../../README.md"
+      - "../plans/e-freshness-preimplementation.md"
+      - "../../src/internal/freshness/freshness_test.go"
+    related: ["FR-05", "INV-06"]
+    statement: >-
+      In at least 20 fixed cases covering update, delete, reopen and
+      concurrent change, zero old citations or answers continue to display
+      as currently valid.
+    metric: "stale_evidence_displayed_as_currently_valid"
+    threshold: 0
+    method: >-
+      Run the frozen offline suite in src/internal/freshness/freshness_test.go
+      (E-NFR05-01 onwards) plus service, SQLite and HTTP reopen tests
+      E-T02, E-T03, E-T07 and E-T08. Count any updated, deleted, forged,
+      lookup-failed or concurrent case that is still displayed as current.
+      The overshoot must be zero. Cases use fixed snapshots, not live models.
+    fit:
+      - id: AC-NFR-05-1
+        scenario: "The frozen 20-plus case set is executed, including update, delete, reopen and concurrent categories."
+        expected: "Every stale case has a non-current status and the overshoot count is zero. Genuine unchanged matches may remain current."
+        test: E-T01
+      - id: AC-NFR-05-2
+        scenario: "A history read races with a content save or delete, or the version lookup returns an error."
+        expected: "After the operations complete, a subsequent reopen is not displayed as currently valid. Lookup errors fail closed."
+        test: E-T07
+    tradeoff: >-
+      The suite is deterministic and offline. It measures display of current
+      validity after source change, not LLM answer quality. A mid-flight
+      history read may observe the pre-update row; the post-join reopen is
+      the acceptance point for concurrent cases.
+  - id: INV-06
+    type: invariant
+    owner: "刘若轩 (E)"
+    approval: pending
+    priority: Must
+    source:
+      - "../architecture/adr/003-citation-version-freshness.md#invariants"
+      - "../plans/e-freshness-preimplementation.md"
+    related: ["NFR-05"]
+    statement: >-
+      A stored chat answer or citation is displayed as currently valid only
+      when a server-side lookup shows that the saved content still exists
+      and its content_revision and content_hash match the captured snapshot.
+      Lookup errors, missing snapshots, forged client labels and source
+      updates or deletes fail closed.
+    fit:
+      - id: AC-INV-06-1
+        scenario: "Evidence is reopened after an update, delete, missing snapshot, forged label or lookup error."
+        expected: "Displayed-as-currently-valid is false. C's generation-time verification status is not rewritten into a current freshness label."
+        test: E-T05
+      - id: AC-INV-06-2
+        scenario: "The version reader is not configured or returns an error during Chat or ChatHistory."
+        expected: "The result does not display the evidence as currently valid."
+        test: E-T08
+    tradeoff: >-
+      Fail-closed unavailable or expired states can hide still-accurate
+      quotes when the database cannot be read. That is preferred to showing
+      stale evidence as current.
+  - id: INV-07
+    type: invariant
+    owner: "刘若轩 (E)"
+    approval: pending
+    priority: Must
+    source:
+      - "../architecture/adr/003-citation-version-freshness.md#invariants"
+      - "../plans/e-freshness-preimplementation.md"
+    related: ["FR-05"]
+    statement: >-
+      ChatHistory and other reopen paths recompute freshness from the live
+      saved content and the stored snapshots. The stored historical text is
+      not deleted; only the derived status changes. Repeated reopen against
+      an unchanged source is stable.
+    fit:
+      - id: AC-INV-07-1
+        scenario: "A stored conversation is loaded through ChatHistory or GET /api/ai/chat after the source changes, then loaded again."
+        expected: "Both loads report the same non-current status while the live content is unchanged after the update or delete. Answer text remains stored."
+        test: E-T04
+    tradeoff: >-
+      Freshness is derived at read time and is not a durable rewrite of the
+      history blob, so a crash during GET cannot leave a permanently wrong
+      stored current label.

@@ -20,9 +20,15 @@ type retrievalChatProvider struct {
 	lastSource   string
 	lastMessages []ChatMessage
 	answer       string
+	// onChat runs after the service has assembled context and before it
+	// stamps freshness, so a test can save a new source mid-generation.
+	onChat func()
 }
 
 func (p *retrievalChatProvider) Chat(ctx context.Context, c Config, source string, messages []ChatMessage) (string, error) {
+	if p.onChat != nil {
+		p.onChat()
+	}
 	p.chatCalls++
 	p.lastSource = source
 	p.lastMessages = append([]ChatMessage(nil), messages...)
