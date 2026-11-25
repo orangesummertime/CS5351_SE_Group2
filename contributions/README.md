@@ -18,7 +18,11 @@ Records start with this fork's first group commit. Each entry states the actual 
 | [012](012-owner-a-stream-review-fixes.md) | `fix: preserve AI stream and summary terminal states` | Kefan CHEN | Strict limited-stream completion, usage-only chunks and summary failure snapshots |
 | [013](013-owner-b-implementation.md) | `docs: record B retrieval approval and phase-0 gate` (phase 0; later phases append) | WANG Jiaqi | B implementation of FR-02/NFR-02/INV-04/INV-05: approval gate, baselines, then phased retrieval implementation |
 | [014](014-owner-d-comparison-implementation.md) | `99c38dd` | Wenlong Lu | FR-04 comparison, source preparation, verified evidence, budget integration and functional verification; NFR-04 local assisted self-evaluation passed; independent review pending |
+| [014](014-owner-e-claim-and-plan.md) | `docs: claim owner E and register FR-05 freshness plan` | 刘若轩 | Claim E, register FR-05/NFR-05/INV-06/INV-07, ADR-003, test plan, CI design |
+| [015](015-owner-e-implementation.md) | `feat: mark stored chat evidence expired after source change` | 刘若轩 | Chat freshness implementation, offline tests, UI status, in-repo CI workflows |
 
 The upstream history predates this group record and is not reconstructed here.
 Numbering is append-only and shared by all owners; a new owner takes the next free
 number after the records already merged into `main`.
+
+`014` was allocated in parallel before these histories met. `014-owner-d-comparison-implementation.md` is the record already merged to `main` with PR #12, so that number stays with D. `014-owner-e-claim-and-plan.md` and `015-owner-e-implementation.md` keep the filenames already cited by Owner E's plan, evidence, and AI-use log. Neither file is renumbered or dropped. The next free number after these records is 016.

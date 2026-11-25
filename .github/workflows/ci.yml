@@ -1,0 +1,103 @@
+name: Course gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-approval:
+    name: Test approval
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test-approval gate self-tests
+        run: python3 scripts/ci/test_approval_gate.py
+      - name: Semantic-eval scope self-test
+        run: bash scripts/ci/semantic-eval_test.sh
+      - name: Check test approval record
+        run: python3 scripts/ci/test-approval.py
+
+  static-analysis:
+    name: Static analysis
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.1"
+          cache: true
+          cache-dependency-path: src/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.21.0"
+          cache: npm
+          cache-dependency-path: src/web/package-lock.json
+      - name: Static-analysis diff self-tests
+        run: bash scripts/ci/static-analysis-diff_test.sh
+      - name: Run static analysis
+        run: bash scripts/ci/static-analysis.sh
+
+  schema:
+    name: Requirements schema
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.21.0"
+      - name: Validate requirements.yaml
+        run: bash scripts/ci/schema.sh
+
+  semantic-eval:
+    name: Semantic evaluation
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.1"
+          cache: true
+          cache-dependency-path: src/go.sum
+      - name: Fail unmet prompt or model-configuration scope
+        run: bash scripts/ci/semantic-eval.sh
+
+  regression:
+    name: Regression
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.1"
+          cache: true
+          cache-dependency-path: src/go.sum
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.21.0"
+          cache: npm
+          cache-dependency-path: src/web/package-lock.json
+      - name: Run prior test suites
+        run: bash scripts/ci/regression.sh
+
+  ai-use-log:
+    name: AI-use log
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require AI-use log updates with code or prompt changes
+        run: bash scripts/ci/ai-use-log.sh

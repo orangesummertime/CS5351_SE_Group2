@@ -33,6 +33,7 @@ func (s *Service) ChatHistory(ctx context.Context, contentID string) (ChatResult
 	if len(row.Value) > 512<<10 || json.Unmarshal([]byte(row.Value), &messages) != nil || !utf8ValidChat("", messages) {
 		return ChatResult{}, ErrStorage
 	}
+	messages = s.assessHistory(ctx, contentID, messages)
 	return ChatResult{ContentID: contentID, Messages: messages, UpdatedAt: row.CreatedAt}, nil
 }
 
@@ -90,20 +91,22 @@ func (s *Service) chat(ctx context.Context, in ChatRequest, emit func(string) er
 		}
 		return ChatResult{ContentID: in.ContentID, Messages: []ChatMessage{}, Budget: budgetReportFor(ctx)}, nil
 	}
-	var history []ChatMessage
+	var stored []ChatMessage
 	if row, err := s.results.AIResult(ctx, chatResultKind, key, ""); err == nil {
-		_ = json.Unmarshal([]byte(row.Value), &history)
+		_ = json.Unmarshal([]byte(row.Value), &stored)
 	} else if !errors.Is(err, ErrNotFound) {
 		return ChatResult{}, ErrStorage
 	}
+	history := stored
 	if len(in.Messages) > 0 {
 		history = append([]ChatMessage(nil), in.Messages...)
 
-		// Client-supplied citations are untrusted.
-		// Only citations generated and validated by the server may be retained.
-		for i := range history {
-			history[i].Citations = nil
-		}
+		// Client-supplied citations and freshness labels are untrusted.
+		// Strip them, then restore evidence for earlier turns from the
+		// server-stored transcript. A resend must not drop that snapshot,
+		// and it must not be able to replace it.
+		stripUntrustedEvidence(history)
+		restoreServerEvidence(history, stored)
 	}
 	if len(history) == 0 || history[len(history)-1].Role != "user" {
 		return ChatResult{}, ErrInvalid
@@ -139,6 +142,10 @@ func (s *Service) chat(ctx context.Context, in ChatRequest, emit func(string) er
 		source = withCitationInstruction(runResult.Context, in.CiteParagraphs)
 		citationPassages = runResult.Passages
 	}
+	// Capture the snapshot this context was read from before generation.
+	// The stamp below compares it with a second lookup so a Save during
+	// generation cannot label the earlier answer current.
+	binding := s.bindGenerationSource(ctx, in, citationPassages)
 
 	var answer string
 	streamCompleted := false
@@ -305,13 +312,17 @@ func (s *Service) chat(ctx context.Context, in ChatRequest, emit func(string) er
 		}
 	}
 
-	history = append(history, ChatMessage{Role: "assistant", Content: strings.TrimSpace(cleanAnswer), Model: c.Model, Citations: citations})
+	assistant := ChatMessage{Role: "assistant", Content: strings.TrimSpace(cleanAnswer), Model: c.Model, Citations: citations}
+	current, lookupErr := lookupCurrent(ctx, s.contentVersionReader(), in.ContentID)
+	stampFreshness(&assistant, in.ContentID, binding, current, lookupErr)
+	history = append(history, assistant)
 	value, _ := json.Marshal(history)
 	if err := s.results.PutAIResult(ctx, StoredResult{Kind: chatResultKind, SourceHash: key, Value: string(value), Target: "", Model: c.Model, CreatedAt: time.Now().Unix()}); err != nil {
 		return ChatResult{}, ErrStorage
 	}
 
 	SetOutcome(ctx, OutcomeCompleted)
+	history = applyFreshness(history, in.ContentID, current, lookupErr)
 	return ChatResult{ContentID: in.ContentID, Messages: history, UpdatedAt: time.Now().Unix(), Budget: budgetReportFor(ctx), Retrieval: retrievalResp}, nil
 }
 

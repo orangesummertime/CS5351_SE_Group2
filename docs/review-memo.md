@@ -72,3 +72,36 @@ The reviewer decision above remains **CHANGES REQUIRED** until the reviewer re-r
 The initial scope line above describes A-T01–A-T21 at the time of the first review. The revised plan now also contains A-T22, linked to a dedicated AC-INV-01-2 fit criterion. WANG Jiaqi approved the prior documentation commit `05b8feb`; this follow-up and the main-branch update create a new head that requires another review. The original signed findings and approval remain historical records.
 
 The authenticated owner-side repository API reported one required non-author approval, stale-review dismissal, last-push approval, conversation resolution, and administrator enforcement. The reviewer could verify only that main was protected, so these settings should be independently checked before they are used as evidence of course gate compliance. The six CI gates remain unimplemented.
+
+## Owner E · version freshness and in-repo CI gates (awaiting independent review)
+
+- **Branch:** `owner-e-liu-ruoxuan` (local work; not pushed from the authoring environment).
+- **Author / owner:** 刘若轩 (Owner E, GitHub: h5f8fzckp7-coder, student ID 60862168).
+- **Scope:** claim E; register FR-05, NFR-05, INV-06 and INV-07 (approval pending); ADR-003; deterministic freshness implementation and tests; chat UI status labels; in-repo CI workflows for the six course gates; evidence and debt notes.
+- **Suggested reviewer:** Wenlong Lu (Owner D), following the group's cross-review suggestion. Any non-author teammate is acceptable. The author cannot approve this work.
+- **Decision:** **READY FOR REVIEW**. This is not an approval, not a self-approval, and not implementation acceptance. The test-approval CI job is expected to fail until a non-author records an APPROVED entry under `docs/evidence/test-approvals/`.
+
+### Spec alignment
+
+FR-05, NFR-05, INV-06 and INV-07 were appended to `docs/req/requirements.yaml` and are intended to validate against `req-schema.json`. Fit criteria map to E-T01–E-T08. MoSCoW (Must), an explicit tradeoff, and NFR metric/threshold/method are present. Approval remains `pending`.
+
+### Architecture alignment
+
+ADR-003 separates E's read-time freshness from C's generation-time `Status` and from upstream summary-citation caching. Snapshots use B's `content_revision` / `content_hash`. No shipped migration is edited. Fail-closed behaviour and client-label stripping are specified. Notes and D comparison freshness are deferred in the debt register.
+
+### Code and test quality
+
+Deterministic offline tests cover a frozen set of at least 20 NFR-05 cases, update, delete, reopen, concurrent save, lookup failure, unwired reader, forged client labels, and frontend presentation negatives. See `docs/evidence/e-verification.md`. The author has not obtained an independent review of the test design before implementation; that gap should be judged by the reviewer and is exactly what the test-approval gate is meant to catch.
+
+### Security and efficiency
+
+Freshness is a deterministic safety-relevant boundary on how stored AI evidence is displayed. Client-supplied current labels are discarded. Lookup errors do not display as current. CI safety-path checks look for credential-like literals. No new provider calls are introduced.
+
+### Operational metadata and CI
+
+In-repo workflows implement the six course jobs. Public observation on 2026-11-20 (Hong Kong time) found required status checks off. This memo does not claim GitHub enforcement or check Issue #3. Official OpenCode + DeepSeek V4 Flash annotated transcripts are still outstanding (E-D04).
+
+### Sign-off
+
+**刘若轩** — Author — 2026-11-20 (Hong Kong time) — Decision: **READY FOR REVIEW, not approved**. Independent review required before merge.
+

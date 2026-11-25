@@ -153,6 +153,7 @@ func wireFeatures(dataDir string, configuration config.Config, option Options, r
 	languageAI := newLanguageAI(dataDir, store, option)
 	if languageAI != nil {
 		languageAI.SetRetrievalEngine(retrievalEngine)
+		languageAI.SetContentVersionReader(store)
 		languageAI.SetComparisonSource(comparisonSource{store: store})
 		languageAI.SetSummaryNoteWriter(func(ctx context.Context, result ai.SummaryResult) error {
 			body := summaryNoteBody(result)

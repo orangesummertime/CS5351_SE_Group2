@@ -1038,6 +1038,91 @@ entries:
       validation, never for the claim. No src/ implementation code changed;
       A's budget files untouched. PR + non-author review remain human actions;
       no push in this session.
+  - id: E-AI-001
+    date: "2026-11-20"
+    owner: "刘若轩 (E)"
+    tool: "Grok in Grok Bot (local implementation assistant)"
+    model: "not recorded as a course OpenCode / DeepSeek session"
+    purpose: >-
+      Assist 刘若轩 in claiming Owner E and producing a local, reviewable
+      implementation of FR-05 / NFR-05 / INV-06 / INV-07: register
+      requirements, write ADR-003 and the test plan, implement deterministic
+      chat-answer freshness after source update or delete, add offline tests,
+      show expired/unavailable labels in the chat UI, and add in-repo CI
+      workflows for the six course gates. No GitHub push was performed.
+    scope:
+      read:
+        - "README.md, docs/req/requirements.yaml, docs/req/req-schema.json"
+        - "docs/architecture/adr/001-provider-call-budget.md and 002-question-relevant-retrieval.md"
+        - "src/internal/ai/chat.go, citation, retrieval, adapters/sqlite content revision, transport/http chat history, web AI chat panel"
+        - "existing CI (release.yml only), Issue #3, public branch-protection observation"
+      wrote:
+        - "docs/req/requirements.yaml (FR-05, NFR-05, INV-06, INV-07)"
+        - "docs/architecture/adr/003-citation-version-freshness.md, docs/plans/e-freshness-preimplementation.md, docs/plans/e-ci-gates.md"
+        - "src/internal/freshness, src/internal/ai chat freshness, sqlite CurrentContentVersion, HTTP and UI"
+        - ".github/workflows/ci.yml, scripts/ci/*, contributions/014 and 015"
+        - "docs/ai-use-log.yaml (this entry)"
+    generated_code: true
+    transcript_status: "not an official course OpenCode transcript"
+    official_course_transcripts: pending
+    human_review: pending
+    notes: >-
+      This entry is an honest disclosure of Grok Bot assistance on 2026-11-20
+      (Hong Kong time). It does not invent an OpenCode session, a DeepSeek V4
+      Flash transcript, a session id, or an export hash. The course still
+      requires official OpenCode + DeepSeek V4 Flash raw annotated transcripts
+      for 刘若轩; those have not been produced on this branch (see debt E-D04).
+      Implementation acceptance and test approval remain with a non-author
+      reviewer. No credentials were placed in the repository.
+  - id: E-AI-002
+    date: "2026-11-20"
+    owner: "刘若轩 (E)"
+    tool: "OpenCode"
+    model: "CityU gateway DeepSeek V4 Flash"
+    purpose: >-
+      Official course OpenCode session for Owner E: review and verify the
+      Owner E implementation and PR #11 against the requested freshness and
+      CI-gate corrections, then re-check fix branch
+      cursor/freshness-ci-gates-4fd7 at a3bd25e. This same continuous
+      session also contains earlier case-study / requirements discussion
+      (from the owner's Q0 requirements list through grouping, fit
+      criteria, conflicts, conflict resolution, and responsibility
+      relations). It is a review and verification session, not the
+      implementation session that produced the PR #11 code (see E-AI-001).
+    scope:
+      read:
+        - "PR #11 head aaba126 and fix branch cursor/freshness-ci-gates-4fd7 at a3bd25e"
+        - "chat freshness binding and CI gate scripts under review"
+      executed:
+        - "Independent review of PR #11 (F-01 / F-02 / F-03) and a re-check of a3bd25e, including temporary probe tests that were deleted with the worktree restored"
+        - "Read-only export of this session from the local OpenCode SQLite database (mode=ro); the export script was not added to the repository"
+    generated_code: false
+    original_session_id: ses_e64cc8050ffe1Zrfm7Snor6D2e
+    original_export: owner-local docs/transcripts/owner-e/ea-case-study-session-ses_e64cc8050ffe1Zrfm7Snor6D2e.json
+    original_export_sha256: ad8bbe11add4ac36b2789b2e54447d510c363d699abb6226c40c463d406af64b
+    transcript: >-
+      owner-local docs/transcripts/owner-e/ea-case-study-session-ses_e64cc8050ffe1Zrfm7Snor6D2e.json
+      (raw OpenCode session export, 104 messages, seq 4-801, retained
+      outside git; sha256
+      ad8bbe11add4ac36b2789b2e54447d510c363d699abb6226c40c463d406af64b;
+      can be supplied for course review without altering its contents)
+    transcript_status: "exported"
+    official_course_transcripts: exported
+    human_review: "pending"
+    notes: >-
+      This entry records the official OpenCode + CityU gateway DeepSeek V4
+      Flash raw transcript. It does not replace E-AI-001, which remains the
+      disclosure of earlier Grok Bot implementation assistance. The session
+      is not a pre-implementation approval. Non-author test approval remains
+      pending. The export was taken read-only from
+      ~/.local/share/opencode/opencode.db (session_v2 + session_message),
+      with each message kept field-for-field (id, type, seq, timestamps,
+      original data payload); counts were user 11, assistant 78, idle 10,
+      system 2, synthetic 3. The owner's 11 user turns were checked against
+      the session. The export turn's assistant reply may not be in this
+      file; a later re-export would have a new hash. The subsequent
+      approval-gate tighten at d064280 was not part of this OpenCode
+      session. No credentials were placed in the repository.
   - id: D-AI-001
     date: "2026-11-20"
     recorded_on: "2026-11-22"
@@ -2329,3 +2414,29 @@ entries:
       indexed. No historical lost response, approval, OpenCode attribution or
       instructor waiver is fabricated. No GitHub message, merge or review
       approval is submitted by this task.
+
+  - id: E-AI-003
+    date: "2026-11-25"
+    owner: "刘若轩 (E)"
+    tool: "Cursor Grok 4.7"
+    model: "Grok 4.7"
+    purpose: >-
+      Reconcile owner-e-liu-ruoxuan with orangesummertime/main after PR #12
+      merged. Resolve the integration conflicts so Owner E citation freshness
+      and Owner D comparison both remain, then run the recorded regression on
+      that merged tree. This is not an OpenCode session and not a review.
+    scope:
+      wrote:
+        - "Merge commit 4c29ba7c8bd9143d9686bfa439230c3f3dd4ed82, resolving the six conflicted files"
+        - "docs/evidence/e-main-reconcile-20261125.md"
+        - "docs/ai-use-log.yaml (this entry)"
+    generated_code: true
+    transcript_status: "not an official course OpenCode transcript"
+    official_course_transcripts: "not produced for this reconciliation"
+    human_review: pending
+    notes: >-
+      No official OpenCode raw transcript was committed. No APPROVED
+      test-approval record was added. PR #11 was not merged. The conflict
+      resolution keeps both sides' behavior; contribution filenames were
+      not renumbered. Verification commands and results are in
+      docs/evidence/e-main-reconcile-20261125.md.

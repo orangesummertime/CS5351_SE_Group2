@@ -1,5 +1,7 @@
 package citation
 
+import "tangentry/internal/freshness"
+
 type Status string
 
 const (
@@ -24,6 +26,13 @@ type Citation struct {
 
 	Status Status `json:"status"`
 	Reason string `json:"reason,omitempty"`
+
+	// ContentRevision and ContentHash capture the saved content snapshot at
+	// generation time (E / FR-05). Freshness is recomputed on read and is
+	// not a substitute for Status, which is C's generation-time result.
+	ContentRevision int64            `json:"contentRevision,omitempty"`
+	ContentHash     string           `json:"contentHash,omitempty"`
+	Freshness       freshness.Status `json:"freshness,omitempty"`
 }
 
 type RawCitation struct {

@@ -8,6 +8,7 @@ import type { useSummary } from './useSummary'
 import { request } from '../../shared/api/client'
 import { buildChatContext } from './chatContext'
 import { rememberedChatModel, rememberChatModel, selectedChatModel } from './chatPresentation'
+import { citationDisplayStatus, isDisplayedAsCurrentlyValid, versionStatusLabel, type ChatMessageView } from './chatFreshness'
 import { mergeModelLists, modelsForTask } from './modelPicker'
 import { LIMITED_CANCELLED_NOTICE, LIMITED_INCOMPLETE_NOTICE, LIMITED_INTERRUPTED_NOTICE, budgetBlocker, budgetSummaryText, callLimitField, classifyChatStreamFrame, parseCallLimit, resolveLimitedChatTerminal } from './callBudget'
 import { CallLimitField } from './CallLimitField'
@@ -343,7 +344,7 @@ function applyTitleOverrides(sections: SummarySection[], overrides: Record<strin
   }))
 }
 
-type ChatMessage = { role: 'user' | 'assistant'; content: string; model?: string }
+type ChatMessage = ChatMessageView
 export function AIChatPanel({ contentId, context, revision }: { contentId: string; context: string; revision: number }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -515,6 +516,8 @@ export function AIChatPanel({ contentId, context, revision }: { contentId: strin
             return <><code className={className}>{children}</code>{String(children).includes('\n') && <Button variant="quiet" iconOnly type="button" className="icon-button ai-code-copy" title="复制代码" aria-label="复制代码" onClick={() => void copy(text)}><Clipboard size={14}/></Button>}</>
           },
         }}>{message.content}</ReactMarkdown></div> : <p>{message.content}</p>}
+        {message.role === 'assistant' && versionStatusLabel(message.versionStatus) ? <p className={`ai-chat-version ai-chat-version-${message.versionStatus}`} role="status">{versionStatusLabel(message.versionStatus)}{isDisplayedAsCurrentlyValid(message.versionStatus) ? '' : '，不能当作当前证据'}</p> : null}
+        {message.role === 'assistant' && message.citations && message.citations.length > 0 && <ul className="ai-chat-citations" aria-label="回答引用">{message.citations.map((citation, citationIndex) => { const freshness = citationDisplayStatus(citation); const label = versionStatusLabel(freshness); return <li key={citation.id ?? String(citationIndex)} className={freshness ? `ai-chat-citation ai-chat-citation-${freshness}` : 'ai-chat-citation'}><span className="ai-chat-citation-quote">{citation.quote || '引用'}</span>{label ? <span className="ai-chat-citation-status">{label}{isDisplayedAsCurrentlyValid(freshness) ? '' : '，不能当作当前有效引用'}</span> : null}</li> })}</ul>}
         {message.role === 'assistant' && message.content && !pending && <div className="ai-chat-message-actions"><Button variant="quiet" iconOnly type="button" className="icon-button" title="复制回答" aria-label="复制回答" onClick={() => void copy(message.content)}><Copy size={14}/></Button><Button variant="quiet" iconOnly type="button" className="icon-button" title="重新生成" aria-label="重新生成" onClick={() => regenerate(index)}><RotateCcw size={14}/></Button><Button variant="quiet" iconOnly type="button" className="icon-button" title="存为笔记" aria-label="存为笔记" onClick={() => void saveNote(message.content)}><NotebookPen size={14}/></Button>{message.model && <small title={message.model}>{message.model.split('/').pop()}</small>}</div>}
       </article>)}
       {pending && <p className="ai-chat-pending" role="status"><LoaderCircle size={14} className="spin"/>正在生成…</p>}
